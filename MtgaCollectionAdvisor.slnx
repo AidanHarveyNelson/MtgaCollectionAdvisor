@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MtgaCollectionAdvisor.App/MtgaCollectionAdvisor.App.csproj" />
+    <Project Path="src/MtgaCollectionAdvisor.Core.Tests/MtgaCollectionAdvisor.Core.Tests.csproj" />
+    <Project Path="src/MtgaCollectionAdvisor.Core/MtgaCollectionAdvisor.Core.csproj" />
+  </Folder>
+</Solution>
