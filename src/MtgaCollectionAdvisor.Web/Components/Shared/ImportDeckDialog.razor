@@ -1,0 +1,72 @@
+@using MtgaCollectionAdvisor.Core.Models
+@inject AdvisorSession Session
+
+<div class="modal-backdrop" @onclick="OnCancel">
+    <div class="modal-panel" @onclick:stopPropagation>
+        <h2>Importar deck</h2>
+        <p class="hint">
+            Cole a lista no formato de exportação do Arena (ex.: <code>4 Lightning Bolt (STA) 42</code>),
+            com uma seção <code>Sideboard</code> opcional.
+        </p>
+
+        <div class="field">
+            <label for="deck-name">Nome</label>
+            <input id="deck-name" type="text" placeholder="Meu deck"
+                   value="@_name" @oninput="e => _name = e.Value?.ToString() ?? string.Empty" />
+        </div>
+
+        <div class="field">
+            <label for="deck-format">Formato</label>
+            <select id="deck-format" @onchange="OnFormatChanged">
+                @foreach (var format in Formats.All)
+                {
+                    <option value="@format.Key" selected="@(_format.Key == format.Key)">@format.DisplayName</option>
+                }
+            </select>
+        </div>
+
+        <div class="field">
+            <label for="deck-list">Lista</label>
+            <textarea id="deck-list" class="export-area" placeholder="Deck&#10;4 Card Name&#10;..."
+                      @oninput="e => _decklist = e.Value?.ToString() ?? string.Empty"></textarea>
+        </div>
+
+        @if (_error is not null)
+        {
+            <p class="error-text">@_error</p>
+        }
+
+        <div class="modal-actions">
+            <button @onclick="OnCancel">Cancelar</button>
+            <button class="primary" @onclick="ImportAsync">Importar</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private string _name = string.Empty;
+    private string _decklist = string.Empty;
+    private FormatDefinition _format = Formats.Standard;
+    private string? _error;
+
+    protected override void OnInitialized() => _format = Session.Format;
+
+    private void OnFormatChanged(ChangeEventArgs e)
+    {
+        var key = e.Value?.ToString();
+        _format = Formats.All.FirstOrDefault(f => f.Key == key) ?? Formats.Standard;
+    }
+
+    private async Task ImportAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) { _error = "Dê um nome ao deck."; return; }
+        if (string.IsNullOrWhiteSpace(_decklist)) { _error = "Cole a lista do deck."; return; }
+
+        await Session.ImportDeckAsync(_name.Trim(), _format, _decklist);
+        await OnClose.InvokeAsync();
+    }
+
+    private Task OnCancel() => OnClose.InvokeAsync();
+}

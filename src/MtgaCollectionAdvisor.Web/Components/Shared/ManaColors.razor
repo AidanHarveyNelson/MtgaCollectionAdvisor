@@ -1,0 +1,29 @@
+@* Renders a deck's colour identity using the mana-font symbols. *@
+
+<span class="colors">
+    @if (string.IsNullOrEmpty(Colors))
+    {
+        <span class="colorless-pip" title="Incolor">—</span>
+    }
+    else
+    {
+        @foreach (var color in Colors)
+        {
+            <i class="ms ms-@(char.ToLowerInvariant(color)) ms-cost ms-shadow" title="@ColorName(color)"></i>
+        }
+    }
+</span>
+
+@code {
+    [Parameter] public string Colors { get; set; } = "";
+
+    private static string ColorName(char color) => color switch
+    {
+        'W' => "Branco",
+        'U' => "Azul",
+        'B' => "Preto",
+        'R' => "Vermelho",
+        'G' => "Verde",
+        _ => "Incolor"
+    };
+}

@@ -1,0 +1,405 @@
+@page "/"
+@implements IDisposable
+@inject AdvisorSession Session
+@inject IJSRuntime JS
+@using MtgaCollectionAdvisor.Core.Models
+
+<PageTitle>Decks recomendados</PageTitle>
+
+@if (Session.StartupError is not null)
+{
+    <div class="workspace" style="grid-template-columns: 1fr">
+        <div class="panel empty">
+            <h3>Banco de dados indisponível</h3>
+            <p>@Session.StartupError</p>
+            <p class="hint">
+                Os dados ficam em um arquivo SQLite em
+                <code>%LOCALAPPDATA%\MtgaCollectionAdvisor\advisor.db</code>.
+                Verifique se a pasta é gravável e reinicie o aplicativo.
+            </p>
+        </div>
+    </div>
+    return;
+}
+
+<div class="workspace">
+    <aside class="panel filters">
+        <div class="filter-group">
+            <div class="filter-title">Formato</div>
+            <div class="segmented">
+                @foreach (var format in Formats.All)
+                {
+                    <button class="@(Session.Format.Key == format.Key ? "active" : "")"
+                            disabled="@Session.IsBusy"
+                            @onclick="() => ChangeFormatAsync(format)">
+                        @(format.Key == "pioneer" ? "Pioneer" : format.DisplayName)
+                    </button>
+                }
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <div class="filter-title">Cores</div>
+            <div class="color-picker">
+                @foreach (var color in "WUBRG")
+                {
+                    <button class="color-pip @(_selectedColors.Contains(color) ? "active" : "")"
+                            title="@color"
+                            @onclick="() => ToggleColor(color)">
+                        <i class="ms ms-@(char.ToLowerInvariant(color)) ms-cost"></i>
+                    </button>
+                }
+            </div>
+            <label class="checkbox-row" style="margin-top: var(--space-3)">
+                <input type="checkbox" checked="@_exactColors" @onchange="e => _exactColors = (bool)e.Value!" />
+                <span>Exatamente estas cores</span>
+            </label>
+            <div class="hint">
+                @(_exactColors
+                    ? "Mostra só decks com essa combinação exata."
+                    : "Mostra decks que contenham as cores marcadas.")
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <div class="filter-title">Craftabilidade</div>
+            <label class="checkbox-row">
+                <input type="checkbox" checked="@_onlyCraftable"
+                       @onchange="e => _onlyCraftable = (bool)e.Value!" />
+                <span>Só o que dá pra craftar agora</span>
+            </label>
+            <div class="hint">Usa seus curingas atuais, respeitando a raridade de cada um.</div>
+
+            <div style="margin-top: var(--space-3)">
+                <div class="filter-title">Máximo de curingas</div>
+                <input type="number" min="0" step="1" placeholder="sem limite"
+                       value="@_maxWildcards"
+                       @onchange="e => _maxWildcards = int.TryParse(e.Value?.ToString(), out var v) ? v : null" />
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <div class="filter-title">Buscar</div>
+            <input type="text" placeholder="Nome do deck"
+                   value="@_search"
+                   @oninput="e => _search = e.Value?.ToString() ?? string.Empty" />
+        </div>
+    </aside>
+
+    <section>
+        <div class="panel">
+            <div class="list-header">
+                <h2>Decks recomendados</h2>
+                <span class="result-count">
+                    @Filtered.Count de @Session.Decks.Count decks
+                    @if (HasActiveFilters)
+                    {
+                        <text>— </text><a href="#" @onclick:preventDefault @onclick="ClearFilters">limpar filtros</a>
+                    }
+                </span>
+            </div>
+
+            @if (Session.Decks.Count == 0)
+            {
+                <div class="empty">
+                    <h3>Nenhum deck carregado</h3>
+                    <p>Clique em <strong>Buscar decks</strong> para trazer listas públicas de @Session.Format.DisplayName.</p>
+                </div>
+            }
+            else if (Filtered.Count == 0)
+            {
+                <div class="empty">
+                    <h3>Nenhum deck bate com os filtros</h3>
+                    <p>Afrouxe as cores ou o limite de curingas.</p>
+                </div>
+            }
+            else
+            {
+                <table class="deck-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable @SortClass(SortKey.Name)" @onclick="() => Sort(SortKey.Name)">Deck</th>
+                            <th>Cores</th>
+                            <th class="sortable num @SortClass(SortKey.Wildcards)" @onclick="() => Sort(SortKey.Wildcards)">Curingas</th>
+                            <th>Detalhe</th>
+                            <th class="sortable @SortClass(SortKey.Owned)" @onclick="() => Sort(SortKey.Owned)">Já possuo</th>
+                            <th>Craftável</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var deck in PageItems)
+                        {
+                            <tr class="@(ReferenceEquals(deck, _selected) ? "selected" : "")" @onclick="() => Select(deck)">
+                                <td>
+                                    <div class="deck-name">@deck.Deck.Name</div>
+                                    <div class="deck-meta">@deck.Deck.Popularity.ToString("N0") visualizações</div>
+                                </td>
+                                <td><ManaColors Colors="@deck.Colors" /></td>
+                                <td class="num">
+                                    <span class="wc-total @(deck.Needed.Total == 0 ? "zero" : "")">@deck.Needed.Total</span>
+                                </td>
+                                <td>
+                                    <div class="wc-breakdown">
+                                        <span class="@(deck.Needed.Commons > 0 ? "c" : "off")">@deck.Needed.Commons C</span>
+                                        <span class="@(deck.Needed.Uncommons > 0 ? "u" : "off")">@deck.Needed.Uncommons I</span>
+                                        <span class="@(deck.Needed.Rares > 0 ? "r" : "off")">@deck.Needed.Rares R</span>
+                                        <span class="@(deck.Needed.Mythics > 0 ? "m" : "off")">@deck.Needed.Mythics M</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="owned-cell">
+                                        <div class="owned-bar"><div style="width:@((deck.OwnedFraction * 100).ToString("F0"))%"></div></div>
+                                        <span class="owned-value">@deck.OwnedFraction.ToString("P0")</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (deck.Needed.IsAffordableWith(Session.Collection.Wildcards))
+                                    {
+                                        <span class="badge yes">sim</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge no">não</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <div class="pagination">
+                    <div class="page-size">
+                        <span>Por página</span>
+                        <select value="@_pageSize" @onchange="ChangePageSize">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                    <div class="page-controls">
+                        <button disabled="@(_page <= 1)" @onclick="() => _page--">‹ Anterior</button>
+                        <span class="page-info">Página @_page de @TotalPages</span>
+                        <button disabled="@(_page >= TotalPages)" @onclick="() => _page++">Próxima ›</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (_selected is not null)
+        {
+            <div class="panel detail">
+                <div class="detail-header">
+                    <h2>@_selected.Deck.Name</h2>
+                    <ManaColors Colors="@_selected.Colors" />
+                    <span class="result-count">
+                        faltam @_selected.Needed.Total curingas · @_selected.OwnedFraction.ToString("P0") da lista já é sua
+                    </span>
+                    <div class="detail-actions">
+                        @if (!string.IsNullOrWhiteSpace(_selected.Deck.Url))
+                        {
+                            <a href="@_selected.Deck.Url" target="_blank" rel="noopener">
+                                <button>Abrir origem</button>
+                            </a>
+                        }
+                        <button class="primary" @onclick="CopyDeckAsync">@(_copied ? "Copiado!" : "Copiar para o Arena")</button>
+                        <button @onclick="() => Session.DeleteDeckAsync(_selected!.Deck.SourceId)">Remover</button>
+                    </div>
+                </div>
+
+                <div class="card-columns">
+                    <div>
+                        <div class="card-list-title">Deck principal</div>
+                        @foreach (var gap in _selected.Gaps.Where(g => g.Board == DeckBoard.Main).OrderBy(g => g.CardName))
+                        {
+                            @RenderCardRow(gap)
+                        }
+                    </div>
+
+                    @if (_selected.Gaps.Any(g => g.Board == DeckBoard.Sideboard))
+                    {
+                        <div>
+                            <div class="card-list-title">Sideboard</div>
+                            @foreach (var gap in _selected.Gaps.Where(g => g.Board == DeckBoard.Sideboard).OrderBy(g => g.CardName))
+                            {
+                                @RenderCardRow(gap)
+                            }
+                        </div>
+                    }
+
+                    <div>
+                        <div class="card-list-title">Exportar (formato do Arena)</div>
+                        <textarea class="export-area" readonly>@Session.ExportDeck(_selected.Deck)</textarea>
+                    </div>
+                </div>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private enum SortKey { Wildcards, Owned, Name }
+
+    private readonly HashSet<char> _selectedColors = [];
+    private bool _exactColors;
+    private bool _onlyCraftable;
+    private int? _maxWildcards;
+    private string _search = string.Empty;
+
+    private SortKey _sortBy = SortKey.Wildcards;
+    private bool _descending;
+    private int _page = 1;
+    private int _pageSize = 25;
+
+    private DeckAnalysisResult? _selected;
+    private bool _copied;
+
+    protected override void OnInitialized() => Session.Changed += OnSessionChanged;
+
+    private void OnSessionChanged() => InvokeAsync(() =>
+    {
+        // The selected deck object is replaced on every re-rank; keep the selection by id.
+        if (_selected is not null)
+        {
+            _selected = Session.Decks.FirstOrDefault(d => d.Deck.SourceId == _selected.Deck.SourceId);
+        }
+        _page = 1;
+        StateHasChanged();
+    });
+
+    private async Task ChangeFormatAsync(FormatDefinition format)
+    {
+        _selected = null;
+        await Session.SetFormatAsync(format);
+    }
+
+    private void ToggleColor(char color)
+    {
+        if (!_selectedColors.Remove(color)) _selectedColors.Add(color);
+        _page = 1;
+    }
+
+    private void ClearFilters()
+    {
+        _selectedColors.Clear();
+        _exactColors = false;
+        _onlyCraftable = false;
+        _maxWildcards = null;
+        _search = string.Empty;
+        _page = 1;
+    }
+
+    private bool HasActiveFilters =>
+        _selectedColors.Count > 0 || _onlyCraftable || _maxWildcards is not null || !string.IsNullOrWhiteSpace(_search);
+
+    private void Sort(SortKey key)
+    {
+        if (_sortBy == key) _descending = !_descending;
+        else (_sortBy, _descending) = (key, key != SortKey.Wildcards);
+        _page = 1;
+    }
+
+    private string SortClass(SortKey key) => _sortBy == key ? "active" : "";
+
+    private void ChangePageSize(ChangeEventArgs e)
+    {
+        _pageSize = int.TryParse(e.Value?.ToString(), out var size) ? size : 25;
+        _page = 1;
+    }
+
+    private void Select(DeckAnalysisResult deck)
+    {
+        _selected = ReferenceEquals(deck, _selected) ? null : deck;
+        _copied = false;
+    }
+
+    private async Task CopyDeckAsync()
+    {
+        if (_selected is null) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Session.ExportDeck(_selected.Deck));
+            _copied = true;
+        }
+        catch
+        {
+            _copied = false; // clipboard blocked - the textarea below is the fallback
+        }
+    }
+
+    private List<DeckAnalysisResult> Filtered
+    {
+        get
+        {
+            IEnumerable<DeckAnalysisResult> query = Session.Decks;
+
+            if (_selectedColors.Count > 0)
+            {
+                query = _exactColors
+                    ? query.Where(d => d.Colors.Length == _selectedColors.Count && d.Colors.All(_selectedColors.Contains))
+                    : query.Where(d => _selectedColors.All(c => d.Colors.Contains(c)));
+            }
+
+            if (_onlyCraftable)
+            {
+                query = query.Where(d => d.Needed.IsAffordableWith(Session.Collection.Wildcards));
+            }
+
+            if (_maxWildcards is { } max)
+            {
+                query = query.Where(d => d.Needed.Total <= max);
+            }
+
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                query = query.Where(d => d.Deck.Name.Contains(_search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            query = (_sortBy, _descending) switch
+            {
+                (SortKey.Wildcards, false) => query.OrderBy(d => d.Needed.Total).ThenByDescending(d => d.OwnedFraction),
+                (SortKey.Wildcards, true) => query.OrderByDescending(d => d.Needed.Total),
+                (SortKey.Owned, false) => query.OrderBy(d => d.OwnedFraction),
+                (SortKey.Owned, true) => query.OrderByDescending(d => d.OwnedFraction),
+                (SortKey.Name, false) => query.OrderBy(d => d.Deck.Name),
+                _ => query.OrderByDescending(d => d.Deck.Name)
+            };
+
+            return query.ToList();
+        }
+    }
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(Filtered.Count / (double)_pageSize));
+
+    private IEnumerable<DeckAnalysisResult> PageItems
+    {
+        get
+        {
+            var filtered = Filtered;
+            var page = Math.Clamp(_page, 1, Math.Max(1, (int)Math.Ceiling(filtered.Count / (double)_pageSize)));
+            return filtered.Skip((page - 1) * _pageSize).Take(_pageSize);
+        }
+    }
+
+    private RenderFragment RenderCardRow(CardGap gap) => @<div class="card-row @CardRowClass(gap)">
+        <span class="card-qty">@gap.Owned / @gap.Needed</span>
+        <span class="card-name">@gap.CardName</span>
+        @if (gap.Missing > 0)
+        {
+            <span class="card-need @RarityClass(gap.Rarity)">faltam @gap.Missing</span>
+        }
+    </div>;
+
+    private static string CardRowClass(CardGap gap) =>
+        gap.Missing == 0 ? "owned" : gap.Owned > 0 ? "partial" : "missing";
+
+    private static string RarityClass(CardRarity rarity) => rarity switch
+    {
+        CardRarity.Common => "c",
+        CardRarity.Uncommon => "u",
+        CardRarity.Rare => "r",
+        CardRarity.Mythic => "m",
+        _ => ""
+    };
+
+    public void Dispose() => Session.Changed -= OnSessionChanged;
+}

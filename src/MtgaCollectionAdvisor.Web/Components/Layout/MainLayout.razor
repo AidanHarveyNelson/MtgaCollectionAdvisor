@@ -1,0 +1,73 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AdvisorSession Session
+
+<div class="app">
+    <header class="topbar">
+        <div class="brand">MTGA <span>Collection Advisor</span></div>
+
+        <div class="topbar-stats">
+            <div class="stat">
+                <span class="stat-label">Coleção</span>
+                <span class="stat-value">@Session.Collection.OwnedByGrpId.Count.ToString("N0") cartas</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Curingas</span>
+                <span class="stat-value wildcard-row">
+                    <span class="wildcard common" title="Comuns">@Session.Collection.Wildcards.Commons</span>
+                    <span class="wildcard uncommon" title="Incomuns">@Session.Collection.Wildcards.Uncommons</span>
+                    <span class="wildcard rare" title="Raras">@Session.Collection.Wildcards.Rares</span>
+                    <span class="wildcard mythic" title="Míticas">@Session.Collection.Wildcards.Mythics</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="primary" disabled="@Session.IsBusy"
+                    title="Lê sua coleção direto da memória do MTG Arena (o jogo precisa estar aberto). Leva ~1-2 min na primeira vez."
+                    @onclick="() => Session.ScanCollectionAsync()">
+                Capturar coleção
+            </button>
+            <button disabled="@Session.IsBusy"
+                    title="Baixa decks públicos de @Session.Format.DisplayName da Archidekt, removendo listas repetidas."
+                    @onclick="() => Session.FetchDecksAsync()">
+                Buscar decks
+            </button>
+            <button disabled="@Session.IsBusy"
+                    title="Adiciona um deck colando a lista no formato de exportação do Arena."
+                    @onclick="() => _showImportDeck = true">
+                Importar deck
+            </button>
+            <button disabled="@Session.IsBusy"
+                    title="Rebaixa a base de cartas da Scryfall (nomes, raridades e legalidade). Demora alguns minutos."
+                    @onclick="() => Session.RefreshCardDatabaseAsync()">
+                Atualizar cartas
+            </button>
+        </div>
+    </header>
+
+    <div class="statusbar">
+        @if (Session.IsBusy)
+        {
+            <span class="spinner" aria-hidden="true"></span>
+        }
+        <span>@Session.Status</span>
+    </div>
+
+    @Body
+</div>
+
+@if (_showImportDeck)
+{
+    <ImportDeckDialog OnClose="() => _showImportDeck = false" />
+}
+
+@code {
+    private bool _showImportDeck;
+
+    protected override void OnInitialized() => Session.Changed += OnSessionChanged;
+
+    private void OnSessionChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Session.Changed -= OnSessionChanged;
+}
