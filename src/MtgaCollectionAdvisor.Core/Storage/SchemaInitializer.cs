@@ -46,6 +46,15 @@ public static class SchemaInitializer
         );
         CREATE INDEX IF NOT EXISTS ix_decks_format ON decks (format_key);
 
+        -- No foreign key to decks on purpose: a pin has to outlive the deck row being
+        -- deleted and reinserted by a source refresh, which is the whole point of pinning.
+        CREATE TABLE IF NOT EXISTS pinned_decks (
+            source_id             TEXT PRIMARY KEY,
+            format_key            TEXT NOT NULL,
+            pinned_at             TEXT NOT NULL,
+            wildcards_when_pinned INTEGER NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS deck_cards (
             source_id  TEXT NOT NULL REFERENCES decks (source_id) ON DELETE CASCADE,
             card_name  TEXT NOT NULL,

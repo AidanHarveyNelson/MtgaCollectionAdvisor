@@ -23,13 +23,19 @@ public sealed record DeckFilterCriteria
     /// <summary>None of these cards may be in the deck.</summary>
     public IReadOnlyList<string> ExcludesCards { get; init; } = [];
 
+    /// <summary>Show only decks the user is tracking.</summary>
+    public bool OnlyPinned { get; init; }
+
+    public IReadOnlySet<string> PinnedSourceIds { get; init; } = new HashSet<string>();
+
     public bool IsEmpty =>
         Colors.Count == 0
         && !OnlyCraftable
         && MaxWildcards is null
         && string.IsNullOrWhiteSpace(NameSearch)
         && ContainsCards.Count == 0
-        && ExcludesCards.Count == 0;
+        && ExcludesCards.Count == 0
+        && !OnlyPinned;
 }
 
 public static class DeckFilter
@@ -72,6 +78,11 @@ public static class DeckFilter
         if (criteria.ExcludesCards.Count > 0)
         {
             query = query.Where(d => !criteria.ExcludesCards.Any(card => PlaysCard(d, card)));
+        }
+
+        if (criteria.OnlyPinned)
+        {
+            query = query.Where(d => criteria.PinnedSourceIds.Contains(d.Deck.SourceId));
         }
 
         return query.ToList();

@@ -29,6 +29,7 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
 
     public CollectionSnapshot Collection { get; private set; } = CollectionSnapshot.Empty;
     public IReadOnlyList<DeckAnalysisResult> Decks { get; private set; } = [];
+    public IReadOnlyDictionary<string, PinnedDeck> Pins { get; private set; } = new Dictionary<string, PinnedDeck>();
     public FormatDefinition Format { get; private set; } = Formats.Standard;
     public DateTimeOffset? CardsUpdatedAt { get; private set; }
 
@@ -105,6 +106,29 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
 
     public string ExportDeck(CandidateDeck deck) => ArenaDeckListWriter.Write(deck);
 
+    public bool IsPinned(string sourceId) => Pins.ContainsKey(sourceId);
+
+    /// <summary>
+    /// Pins or unpins without refetching anything - the ranking in memory is unchanged,
+    /// only which decks are marked.
+    /// </summary>
+    public async Task TogglePinAsync(DeckAnalysisResult deck)
+    {
+        if (services is null) return;
+
+        if (IsPinned(deck.Deck.SourceId))
+        {
+            await services.PinnedDeckStore.UnpinAsync(deck.Deck.SourceId);
+        }
+        else
+        {
+            await services.PinnedDeckStore.PinAsync(deck.Deck.SourceId, deck.Deck.FormatKey, deck.Needed.Total);
+        }
+
+        Pins = await services.PinnedDeckStore.LoadAsync();
+        Notify();
+    }
+
     /// <summary>Card-name autocomplete for the card filters.</summary>
     public Task<IReadOnlyList<string>> SearchCardNamesAsync(string term) =>
         services is null
@@ -140,6 +164,7 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
     private async Task ReloadRankingAsync()
     {
         Collection = await services.CollectionStore.LoadAsync();
+        Pins = await services.PinnedDeckStore.LoadAsync();
         var stored = await services.CuratedDeckStore.LoadAsync(Format);
 
         if (stored.Count == 0)

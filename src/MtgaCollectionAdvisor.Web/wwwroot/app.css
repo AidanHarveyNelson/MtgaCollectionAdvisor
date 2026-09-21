@@ -410,6 +410,32 @@ input[type="text"], input[type="number"], select {
     resize: vertical;
 }
 
+/* ---------- Pinning ---------- */
+
+.pin-col { width: 34px; padding-right: 0 !important; }
+
+.pin {
+    border: none;
+    background: transparent;
+    color: var(--border-strong);
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.pin:hover { background: transparent; color: var(--accent); transform: scale(1.15); }
+.pin.on { color: var(--accent); }
+
+.progress {
+    margin-left: var(--space-2);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.progress.down { color: var(--positive); }
+.progress.up { color: var(--negative); }
+
 /* ---------- Card picker ---------- */
 
 .card-picker { margin-bottom: var(--space-3); }

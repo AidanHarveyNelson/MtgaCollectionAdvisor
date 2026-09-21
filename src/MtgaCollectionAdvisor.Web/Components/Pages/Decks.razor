@@ -71,6 +71,12 @@
             </label>
             <div class="hint">Uses your current wildcards, respecting each rarity.</div>
 
+            <label class="checkbox-row" style="margin-top: var(--space-3)">
+                <input type="checkbox" checked="@_onlyPinned"
+                       @onchange="e => { _onlyPinned = (bool)e.Value!; _page = 1; }" />
+                <span>Pinned only</span>
+            </label>
+
             <div style="margin-top: var(--space-3)">
                 <div class="filter-title">Wildcard budget</div>
                 <input type="number" min="0" step="1" placeholder="no limit"
@@ -125,6 +131,7 @@
                 <table class="deck-table">
                     <thead>
                         <tr>
+                            <th class="pin-col"></th>
                             <th class="sortable @SortClass(SortKey.Name)" @onclick="() => Sort(SortKey.Name)">Deck</th>
                             <th>Colours</th>
                             <th class="sortable num @SortClass(SortKey.Wildcards)" @onclick="() => Sort(SortKey.Wildcards)">Wildcards</th>
@@ -137,9 +144,22 @@
                         @foreach (var deck in PageItems)
                         {
                             <tr class="@(ReferenceEquals(deck, _selected) ? "selected" : "")" @onclick="() => Select(deck)">
+                                <td class="pin-col" @onclick:stopPropagation>
+                                    <button class="pin @(Session.IsPinned(deck.Deck.SourceId) ? "on" : "")"
+                                            title="@(Session.IsPinned(deck.Deck.SourceId) ? "Unpin" : "Pin to track progress")"
+                                            @onclick="() => Session.TogglePinAsync(deck)">★</button>
+                                </td>
                                 <td>
                                     <div class="deck-name">@deck.Deck.Name</div>
-                                    <div class="deck-meta">@deck.Deck.Popularity.ToString("N0") views</div>
+                                    <div class="deck-meta">
+                                        @deck.Deck.Popularity.ToString("N0") views
+                                        @if (Progress(deck) is { } moved && moved != 0)
+                                        {
+                                            <span class="progress @(moved > 0 ? "down" : "up")">
+                                                @(moved > 0 ? $"▼ {moved} since pinned" : $"▲ {-moved} since pinned")
+                                            </span>
+                                        }
+                                    </div>
                                 </td>
                                 <td><ManaColors Colors="@deck.Colors" /></td>
                                 <td class="num">
@@ -251,6 +271,7 @@
     private bool _onlyCraftable;
     private int? _maxWildcards;
     private string _search = string.Empty;
+    private bool _onlyPinned;
     private IReadOnlyList<string> _containsCards = [];
     private IReadOnlyList<string> _excludesCards = [];
 
@@ -296,6 +317,7 @@
         _search = string.Empty;
         _containsCards = [];
         _excludesCards = [];
+        _onlyPinned = false;
         _page = 1;
     }
 
@@ -360,8 +382,16 @@
         MaxWildcards = _maxWildcards,
         NameSearch = _search,
         ContainsCards = _containsCards,
-        ExcludesCards = _excludesCards
+        ExcludesCards = _excludesCards,
+        OnlyPinned = _onlyPinned,
+        PinnedSourceIds = Session.Pins.Keys.ToHashSet()
     };
+
+    /// <summary>Wildcards saved since the deck was pinned; positive means closer to done.</summary>
+    private int? Progress(DeckAnalysisResult deck) =>
+        Session.Pins.TryGetValue(deck.Deck.SourceId, out var pin)
+            ? pin.WildcardsWhenPinned - deck.Needed.Total
+            : null;
 
     private List<DeckAnalysisResult> Filtered
     {
@@ -380,7 +410,9 @@
                 _ => query.OrderByDescending(d => d.Deck.Name)
             };
 
-            return query.ToList();
+            return query
+                .OrderByDescending(d => Session.IsPinned(d.Deck.SourceId))
+                .ToList();
         }
     }
 
