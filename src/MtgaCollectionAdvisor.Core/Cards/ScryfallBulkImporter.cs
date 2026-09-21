@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -33,10 +34,28 @@ public sealed class ScryfallBulkImporter(HttpClient httpClient)
         var defaultCards = listResponse?.Data.FirstOrDefault(d => d.Type == "default_cards")
             ?? throw new InvalidOperationException("Scryfall bulk-data listing did not contain a 'default_cards' entry.");
 
-        await using var stream = await httpClient.GetStreamAsync(defaultCards.DownloadUri, ct);
+        if (string.IsNullOrEmpty(defaultCards.JsonlDownloadUri))
+            throw new InvalidOperationException("Scryfall bulk-data 'default_cards' entry has no jsonl_download_uri.");
 
-        await foreach (var card in JsonSerializer.DeserializeAsyncEnumerable<ScryfallCard>(stream, JsonOptions, ct))
+        await using var rawStream = await httpClient.GetStreamAsync(defaultCards.JsonlDownloadUri, ct);
+        await using var gzipStream = new GZipStream(rawStream, CompressionMode.Decompress);
+        using var reader = new StreamReader(gzipStream);
+
+        string? line;
+        while ((line = await reader.ReadLineAsync(ct)) != null)
         {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            ScryfallCard? card;
+            try
+            {
+                card = JsonSerializer.Deserialize<ScryfallCard>(line, JsonOptions);
+            }
+            catch (JsonException)
+            {
+                continue; // skip any malformed line rather than aborting the whole import
+            }
+
             if (card is null || card.ArenaId is null) continue;
 
             yield return new CardInfo(

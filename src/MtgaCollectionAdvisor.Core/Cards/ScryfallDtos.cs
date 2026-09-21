@@ -5,7 +5,12 @@ namespace MtgaCollectionAdvisor.Core.Cards;
 internal sealed class ScryfallBulkDataEntry
 {
     [JsonPropertyName("type")] public string Type { get; set; } = "";
-    [JsonPropertyName("download_uri")] public string DownloadUri { get; set; } = "";
+
+    /// <summary>
+    /// Scryfall retired the old single-JSON-array "download_uri" field; bulk data is
+    /// now published as gzip-compressed JSON Lines (one card object per line).
+    /// </summary>
+    [JsonPropertyName("jsonl_download_uri")] public string JsonlDownloadUri { get; set; } = "";
 }
 
 internal sealed class ScryfallBulkDataResponse
