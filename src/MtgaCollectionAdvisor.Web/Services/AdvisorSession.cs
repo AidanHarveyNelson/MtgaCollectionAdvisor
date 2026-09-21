@@ -105,6 +105,12 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
 
     public string ExportDeck(CandidateDeck deck) => ArenaDeckListWriter.Write(deck);
 
+    /// <summary>Card-name autocomplete for the card filters.</summary>
+    public Task<IReadOnlyList<string>> SearchCardNamesAsync(string term) =>
+        services is null
+            ? Task.FromResult<IReadOnlyList<string>>([])
+            : services.CardDatabaseStore.SearchNamesAsync(term);
+
     /// <summary>Adds a deck pasted by hand (Arena export format) to the candidate pool.</summary>
     public Task ImportDeckAsync(string name, FormatDefinition format, string decklist) =>
         RunAsync("Importing deck", async report =>

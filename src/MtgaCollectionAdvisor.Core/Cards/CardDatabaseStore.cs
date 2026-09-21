@@ -95,6 +95,41 @@ public sealed class CardDatabaseStore(Database database)
         return ids;
     }
 
+    /// <summary>
+    /// Distinct card names starting with <paramref name="term"/>, for autocomplete.
+    /// Prefix rather than substring matching: it uses the name index and gives
+    /// predictable results as the user types.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> SearchNamesAsync(
+        string term, int limit = 10, CancellationToken ct = default)
+    {
+        var prefix = term.Trim();
+        if (prefix.Length < 2) return [];
+
+        await using var connection = await database.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT DISTINCT name FROM cards
+            WHERE name LIKE $prefix ESCAPE '\' COLLATE NOCASE
+            ORDER BY name
+            LIMIT $limit
+            """;
+        // The term is user input, so neutralise LIKE's own wildcards before appending ours.
+        command.Parameters.AddWithValue("$prefix", Escape(prefix) + "%");
+        command.Parameters.AddWithValue("$limit", limit);
+
+        var names = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            names.Add(reader.GetString(0));
+        }
+        return names;
+    }
+
+    private static string Escape(string term) =>
+        term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+
     public async Task<IReadOnlyList<CardInfo>> FindByNameAsync(string name, CancellationToken ct = default)
     {
         await using var connection = await database.OpenAsync(ct);
