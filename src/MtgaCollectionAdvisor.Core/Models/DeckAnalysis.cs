@@ -41,6 +41,14 @@ public sealed record WildcardNeed(int Commons, int Uncommons, int Rares, int Myt
         Uncommons + other.Uncommons,
         Rares + other.Rares,
         Mythics + other.Mythics);
+
+    /// <summary>
+    /// Wildcards are rarity-specific in Arena (a Rare wildcard can't craft a Mythic),
+    /// so affordability must be checked per rarity, not just by total count.
+    /// </summary>
+    public bool IsAffordableWith(WildcardInventory wallet) =>
+        wallet.Commons >= Commons && wallet.Uncommons >= Uncommons &&
+        wallet.Rares >= Rares && wallet.Mythics >= Mythics;
 }
 
 public sealed record DeckAnalysisResult(
@@ -49,8 +57,16 @@ public sealed record DeckAnalysisResult(
     int OwnedCopies,
     int TotalCopies,
     IReadOnlyList<CardGap> Gaps,
-    IReadOnlyList<string> UnavailableOnArena)
+    IReadOnlyList<string> UnavailableOnArena,
+    IReadOnlyList<string> IllegalInFormat,
+    string Colors)
 {
     public double OwnedFraction => TotalCopies == 0 ? 0 : (double)OwnedCopies / TotalCopies;
     public bool FullyPlayableOnArena => UnavailableOnArena.Count == 0;
+
+    /// <summary>
+    /// Deck sources let users file a deck under any format they like, so a "Standard"
+    /// deck may well contain cards that rotated out years ago.
+    /// </summary>
+    public bool LegalInFormat => IllegalInFormat.Count == 0;
 }

@@ -23,6 +23,8 @@ public sealed class WildcardCalculator(CardDatabaseStore cardStore)
     {
         var gaps = new List<CardGap>();
         var unavailable = new List<string>();
+        var illegal = new List<string>();
+        var colors = new HashSet<char>();
         var needed = WildcardNeed.Zero;
         var ownedCopies = 0;
         var totalCopies = 0;
@@ -47,9 +49,15 @@ public sealed class WildcardCalculator(CardDatabaseStore cardStore)
             var legalPrintings = printings
                 .Where(p => format.Key == Models.Formats.Standard.Key ? p.StandardLegal : p.PioneerLegal)
                 .ToList();
+            if (legalPrintings.Count == 0) illegal.Add(cardRef.Name);
             var candidates = legalPrintings.Count > 0 ? legalPrintings : printings;
             var cheapest = candidates.OrderBy(p => RarityRank(p.Rarity)).First();
             var ownedAcrossPrintings = candidates.Sum(p => collection.OwnedQuantity(p.GrpId));
+
+            if (cardRef.Board == DeckBoard.Main)
+            {
+                foreach (var color in cheapest.Colors) colors.Add(color);
+            }
 
             ownedCopies += Math.Min(ownedAcrossPrintings, cardRef.Quantity);
 
@@ -62,8 +70,13 @@ public sealed class WildcardCalculator(CardDatabaseStore cardStore)
             }
         }
 
-        return new DeckAnalysisResult(deck, needed, ownedCopies, totalCopies, gaps, unavailable);
+        return new DeckAnalysisResult(
+            deck, needed, ownedCopies, totalCopies, gaps, unavailable, illegal, SortColors(colors));
     }
+
+    /// <summary>Colors in WUBRG order, the way Magic always writes them.</summary>
+    private static string SortColors(HashSet<char> colors) =>
+        new([.. "WUBRG".Where(colors.Contains)]);
 
     private static int RarityRank(CardRarity rarity) => rarity switch
     {
