@@ -23,7 +23,7 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
     /// <summary>Set when the app could not start (database unreachable); the UI shows it.</summary>
     public string? StartupError { get; private set; }
 
-    public string Status { get; private set; } = "Pronto.";
+    public string Status { get; private set; } = "Ready.";
     public bool IsBusy { get; private set; }
     public string? BusyOperation { get; private set; }
 
@@ -40,7 +40,7 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
         }
         catch (Exception ex)
         {
-            StartupError = $"Não consegui abrir o banco local: {ex.Message}";
+            StartupError = $"Could not open the local database: {ex.Message}";
             Status = StartupError;
             Notify();
             return;
@@ -62,44 +62,44 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
         await ReloadRankingAsync();
     }
 
-    public Task ScanCollectionAsync() => RunAsync("Capturando coleção", async report =>
+    public Task ScanCollectionAsync() => RunAsync("Capturing collection", async report =>
     {
         var result = await services.MemoryCollectionSyncService.SyncAutomaticallyAsync(new Progress<string>(report));
         if (result is null)
         {
-            report("Não encontrei a coleção na memória. Abra o MTG Arena e visite a tela de Coleção.");
+            report("Could not find the collection in memory. Open MTG Arena and visit the Collection screen.");
             return;
         }
-        report($"Coleção capturada: {result.DistinctCards} cartas ({result.TotalCopies} cópias).");
+        report($"Collection captured: {result.DistinctCards} cards ({result.TotalCopies} copies).");
         await ReloadRankingAsync();
     });
 
-    public Task FetchDecksAsync() => RunAsync($"Buscando decks de {Format.DisplayName}", async report =>
+    public Task FetchDecksAsync() => RunAsync($"Fetching {Format.DisplayName} decks", async report =>
     {
         var format = Format;
-        report($"Consultando a Archidekt ({format.DisplayName})...");
+        report($"Querying Archidekt ({format.DisplayName})...");
         var decks = await services.ArchidektClient.FetchTopDecksAsync(format, count: 60);
 
         var unique = DeckDeduplicator.Deduplicate(decks);
-        report($"{decks.Count} decks recebidos, {unique.Count} após remover listas repetidas.");
+        report($"{decks.Count} decks received, {unique.Count} after removing duplicate lists.");
 
         await services.CuratedDeckStore.ReplaceAutoFetchedAsync(format, ArchidektClient.SourcePrefix, unique);
         await ReloadRankingAsync();
     });
 
-    public Task RefreshCardDatabaseAsync() => RunAsync("Atualizando base de cartas", async report =>
+    public Task RefreshCardDatabaseAsync() => RunAsync("Updating card database", async report =>
     {
-        report("Baixando bulk data da Scryfall (alguns minutos)...");
+        report("Downloading Scryfall bulk data (a few minutes)...");
         await services.CardDatabaseStore.ReplaceAllAsync(services.ScryfallBulkImporter.ImportAsync());
         CardsUpdatedAt = await services.CardDatabaseStore.GetLastImportedAsync();
-        report("Base de cartas atualizada.");
+        report("Card database updated.");
         await ReloadRankingAsync();
     });
 
-    public Task DeleteDeckAsync(string sourceId) => RunAsync("Removendo deck", async report =>
+    public Task DeleteDeckAsync(string sourceId) => RunAsync("Removing deck", async report =>
     {
         await services.CuratedDeckStore.DeleteDeckAsync(sourceId);
-        report("Deck removido.");
+        report("Deck removed.");
         await ReloadRankingAsync();
     });
 
@@ -107,12 +107,12 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
 
     /// <summary>Adds a deck pasted by hand (Arena export format) to the candidate pool.</summary>
     public Task ImportDeckAsync(string name, FormatDefinition format, string decklist) =>
-        RunAsync("Importando deck", async report =>
+        RunAsync("Importing deck", async report =>
         {
             var cards = ArenaDeckListParser.Parse(decklist);
             if (cards.Count == 0)
             {
-                report("Não reconheci nenhuma carta nesse texto.");
+                report("No cards recognised in that text.");
                 return;
             }
 
@@ -126,7 +126,7 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
                 FetchedAt: DateTimeOffset.UtcNow);
 
             await services.CuratedDeckStore.AddDeckAsync(deck);
-            report($"Deck \"{name}\" importado ({cards.Count} linhas).");
+            report($"Deck \"{name}\" imported ({cards.Count} lines).");
 
             if (format.Key == Format.Key) await ReloadRankingAsync();
         });
@@ -171,7 +171,7 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
     {
         if (!await _operationGate.WaitAsync(0))
         {
-            Status = $"Aguarde: {BusyOperation} em andamento.";
+            Status = $"Please wait: {BusyOperation} in progress.";
             Notify();
             return;
         }
@@ -191,7 +191,7 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
         }
         catch (Exception ex)
         {
-            Status = $"{operation} falhou: {ex.Message}";
+            Status = $"{operation} failed: {ex.Message}";
         }
         finally
         {

@@ -410,6 +410,25 @@ input[type="text"], input[type="number"], select {
     resize: vertical;
 }
 
+.footer {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: var(--space-4) var(--space-5) var(--space-5);
+    color: var(--text-faint);
+    font-size: 12px;
+}
+
+.footer a {
+    color: var(--text-faint);
+    display: inline-flex;
+    transition: color 120ms ease;
+}
+
+.footer a:hover { color: var(--accent); }
+
 /* ---------- Modal ---------- */
 
 .modal-backdrop {

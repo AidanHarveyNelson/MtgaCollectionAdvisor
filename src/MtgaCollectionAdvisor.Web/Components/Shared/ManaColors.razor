@@ -3,7 +3,7 @@
 <span class="colors">
     @if (string.IsNullOrEmpty(Colors))
     {
-        <span class="colorless-pip" title="Incolor">—</span>
+        <span class="colorless-pip" title="Colourless">—</span>
     }
     else
     {
@@ -19,11 +19,11 @@
 
     private static string ColorName(char color) => color switch
     {
-        'W' => "Branco",
-        'U' => "Azul",
-        'B' => "Preto",
-        'R' => "Vermelho",
-        'G' => "Verde",
-        _ => "Incolor"
+        'W' => "White",
+        'U' => "Blue",
+        'B' => "Black",
+        'R' => "Red",
+        'G' => "Green",
+        _ => "Colourless"
     };
 }

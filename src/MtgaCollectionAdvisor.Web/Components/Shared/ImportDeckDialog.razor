@@ -3,20 +3,20 @@
 
 <div class="modal-backdrop" @onclick="OnCancel">
     <div class="modal-panel" @onclick:stopPropagation>
-        <h2>Importar deck</h2>
+        <h2>Import deck</h2>
         <p class="hint">
-            Cole a lista no formato de exportação do Arena (ex.: <code>4 Lightning Bolt (STA) 42</code>),
-            com uma seção <code>Sideboard</code> opcional.
+            Paste a list in Arena's export format (e.g. <code>4 Lightning Bolt (STA) 42</code>),
+            with an optional <code>Sideboard</code> section.
         </p>
 
         <div class="field">
-            <label for="deck-name">Nome</label>
-            <input id="deck-name" type="text" placeholder="Meu deck"
+            <label for="deck-name">Name</label>
+            <input id="deck-name" type="text" placeholder="My deck"
                    value="@_name" @oninput="e => _name = e.Value?.ToString() ?? string.Empty" />
         </div>
 
         <div class="field">
-            <label for="deck-format">Formato</label>
+            <label for="deck-format">Format</label>
             <select id="deck-format" @onchange="OnFormatChanged">
                 @foreach (var format in Formats.All)
                 {
@@ -26,7 +26,7 @@
         </div>
 
         <div class="field">
-            <label for="deck-list">Lista</label>
+            <label for="deck-list">Decklist</label>
             <textarea id="deck-list" class="export-area" placeholder="Deck&#10;4 Card Name&#10;..."
                       @oninput="e => _decklist = e.Value?.ToString() ?? string.Empty"></textarea>
         </div>
@@ -37,8 +37,8 @@
         }
 
         <div class="modal-actions">
-            <button @onclick="OnCancel">Cancelar</button>
-            <button class="primary" @onclick="ImportAsync">Importar</button>
+            <button @onclick="OnCancel">Cancel</button>
+            <button class="primary" @onclick="ImportAsync">Import</button>
         </div>
     </div>
 </div>
@@ -61,8 +61,8 @@
 
     private async Task ImportAsync()
     {
-        if (string.IsNullOrWhiteSpace(_name)) { _error = "Dê um nome ao deck."; return; }
-        if (string.IsNullOrWhiteSpace(_decklist)) { _error = "Cole a lista do deck."; return; }
+        if (string.IsNullOrWhiteSpace(_name)) { _error = "Give the deck a name."; return; }
+        if (string.IsNullOrWhiteSpace(_decklist)) { _error = "Paste the decklist."; return; }
 
         await Session.ImportDeckAsync(_name.Trim(), _format, _decklist);
         await OnClose.InvokeAsync();

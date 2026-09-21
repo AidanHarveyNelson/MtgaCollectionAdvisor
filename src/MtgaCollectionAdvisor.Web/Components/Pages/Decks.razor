@@ -4,18 +4,18 @@
 @inject IJSRuntime JS
 @using MtgaCollectionAdvisor.Core.Models
 
-<PageTitle>Decks recomendados</PageTitle>
+<PageTitle>Recommended decks</PageTitle>
 
 @if (Session.StartupError is not null)
 {
     <div class="workspace" style="grid-template-columns: 1fr">
         <div class="panel empty">
-            <h3>Banco de dados indisponível</h3>
+            <h3>Database unavailable</h3>
             <p>@Session.StartupError</p>
             <p class="hint">
-                Os dados ficam em um arquivo SQLite em
+                Data lives in a SQLite file at
                 <code>%LOCALAPPDATA%\MtgaCollectionAdvisor\advisor.db</code>.
-                Verifique se a pasta é gravável e reinicie o aplicativo.
+                Check that the folder is writable and restart the app.
             </p>
         </div>
     </div>
@@ -25,7 +25,7 @@
 <div class="workspace">
     <aside class="panel filters">
         <div class="filter-group">
-            <div class="filter-title">Formato</div>
+            <div class="filter-title">Format</div>
             <div class="segmented">
                 @foreach (var format in Formats.All)
                 {
@@ -39,7 +39,7 @@
         </div>
 
         <div class="filter-group">
-            <div class="filter-title">Cores</div>
+            <div class="filter-title">Colours</div>
             <div class="color-picker">
                 @foreach (var color in "WUBRG")
                 {
@@ -52,35 +52,35 @@
             </div>
             <label class="checkbox-row" style="margin-top: var(--space-3)">
                 <input type="checkbox" checked="@_exactColors" @onchange="e => _exactColors = (bool)e.Value!" />
-                <span>Exatamente estas cores</span>
+                <span>Exactly these colours</span>
             </label>
             <div class="hint">
                 @(_exactColors
-                    ? "Mostra só decks com essa combinação exata."
-                    : "Mostra decks que contenham as cores marcadas.")
+                    ? "Only decks with this exact colour combination."
+                    : "Decks that include the selected colours.")
             </div>
         </div>
 
         <div class="filter-group">
-            <div class="filter-title">Craftabilidade</div>
+            <div class="filter-title">Craftability</div>
             <label class="checkbox-row">
                 <input type="checkbox" checked="@_onlyCraftable"
                        @onchange="e => _onlyCraftable = (bool)e.Value!" />
-                <span>Só o que dá pra craftar agora</span>
+                <span>Only what I can craft now</span>
             </label>
-            <div class="hint">Usa seus curingas atuais, respeitando a raridade de cada um.</div>
+            <div class="hint">Uses your current wildcards, respecting each rarity.</div>
 
             <div style="margin-top: var(--space-3)">
-                <div class="filter-title">Máximo de curingas</div>
-                <input type="number" min="0" step="1" placeholder="sem limite"
+                <div class="filter-title">Wildcard budget</div>
+                <input type="number" min="0" step="1" placeholder="no limit"
                        value="@_maxWildcards"
                        @onchange="e => _maxWildcards = int.TryParse(e.Value?.ToString(), out var v) ? v : null" />
             </div>
         </div>
 
         <div class="filter-group">
-            <div class="filter-title">Buscar</div>
-            <input type="text" placeholder="Nome do deck"
+            <div class="filter-title">Search</div>
+            <input type="text" placeholder="Deck name"
                    value="@_search"
                    @oninput="e => _search = e.Value?.ToString() ?? string.Empty" />
         </div>
@@ -89,12 +89,12 @@
     <section>
         <div class="panel">
             <div class="list-header">
-                <h2>Decks recomendados</h2>
+                <h2>Recommended decks</h2>
                 <span class="result-count">
-                    @Filtered.Count de @Session.Decks.Count decks
+                    @Filtered.Count of @Session.Decks.Count decks
                     @if (HasActiveFilters)
                     {
-                        <text>— </text><a href="#" @onclick:preventDefault @onclick="ClearFilters">limpar filtros</a>
+                        <text>— </text><a href="#" @onclick:preventDefault @onclick="ClearFilters">clear filters</a>
                     }
                 </span>
             </div>
@@ -102,15 +102,15 @@
             @if (Session.Decks.Count == 0)
             {
                 <div class="empty">
-                    <h3>Nenhum deck carregado</h3>
-                    <p>Clique em <strong>Buscar decks</strong> para trazer listas públicas de @Session.Format.DisplayName.</p>
+                    <h3>No decks loaded</h3>
+                    <p>Click <strong>Fetch decks</strong> to pull public @Session.Format.DisplayName lists.</p>
                 </div>
             }
             else if (Filtered.Count == 0)
             {
                 <div class="empty">
-                    <h3>Nenhum deck bate com os filtros</h3>
-                    <p>Afrouxe as cores ou o limite de curingas.</p>
+                    <h3>No decks match the filters</h3>
+                    <p>Loosen the colours or raise the wildcard budget.</p>
                 </div>
             }
             else
@@ -119,11 +119,11 @@
                     <thead>
                         <tr>
                             <th class="sortable @SortClass(SortKey.Name)" @onclick="() => Sort(SortKey.Name)">Deck</th>
-                            <th>Cores</th>
-                            <th class="sortable num @SortClass(SortKey.Wildcards)" @onclick="() => Sort(SortKey.Wildcards)">Curingas</th>
-                            <th>Detalhe</th>
-                            <th class="sortable @SortClass(SortKey.Owned)" @onclick="() => Sort(SortKey.Owned)">Já possuo</th>
-                            <th>Craftável</th>
+                            <th>Colours</th>
+                            <th class="sortable num @SortClass(SortKey.Wildcards)" @onclick="() => Sort(SortKey.Wildcards)">Wildcards</th>
+                            <th>Breakdown</th>
+                            <th class="sortable @SortClass(SortKey.Owned)" @onclick="() => Sort(SortKey.Owned)">Owned</th>
+                            <th>Craftable</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -132,7 +132,7 @@
                             <tr class="@(ReferenceEquals(deck, _selected) ? "selected" : "")" @onclick="() => Select(deck)">
                                 <td>
                                     <div class="deck-name">@deck.Deck.Name</div>
-                                    <div class="deck-meta">@deck.Deck.Popularity.ToString("N0") visualizações</div>
+                                    <div class="deck-meta">@deck.Deck.Popularity.ToString("N0") views</div>
                                 </td>
                                 <td><ManaColors Colors="@deck.Colors" /></td>
                                 <td class="num">
@@ -141,7 +141,7 @@
                                 <td>
                                     <div class="wc-breakdown">
                                         <span class="@(deck.Needed.Commons > 0 ? "c" : "off")">@deck.Needed.Commons C</span>
-                                        <span class="@(deck.Needed.Uncommons > 0 ? "u" : "off")">@deck.Needed.Uncommons I</span>
+                                        <span class="@(deck.Needed.Uncommons > 0 ? "u" : "off")">@deck.Needed.Uncommons U</span>
                                         <span class="@(deck.Needed.Rares > 0 ? "r" : "off")">@deck.Needed.Rares R</span>
                                         <span class="@(deck.Needed.Mythics > 0 ? "m" : "off")">@deck.Needed.Mythics M</span>
                                     </div>
@@ -155,11 +155,11 @@
                                 <td>
                                     @if (deck.Needed.IsAffordableWith(Session.Collection.Wildcards))
                                     {
-                                        <span class="badge yes">sim</span>
+                                        <span class="badge yes">yes</span>
                                     }
                                     else
                                     {
-                                        <span class="badge no">não</span>
+                                        <span class="badge no">no</span>
                                     }
                                 </td>
                             </tr>
@@ -169,7 +169,7 @@
 
                 <div class="pagination">
                     <div class="page-size">
-                        <span>Por página</span>
+                        <span>Per page</span>
                         <select value="@_pageSize" @onchange="ChangePageSize">
                             <option value="10">10</option>
                             <option value="25">25</option>
@@ -177,9 +177,9 @@
                         </select>
                     </div>
                     <div class="page-controls">
-                        <button disabled="@(_page <= 1)" @onclick="() => _page--">‹ Anterior</button>
-                        <span class="page-info">Página @_page de @TotalPages</span>
-                        <button disabled="@(_page >= TotalPages)" @onclick="() => _page++">Próxima ›</button>
+                        <button disabled="@(_page <= 1)" @onclick="() => _page--">‹ Previous</button>
+                        <span class="page-info">Page @_page of @TotalPages</span>
+                        <button disabled="@(_page >= TotalPages)" @onclick="() => _page++">Next ›</button>
                     </div>
                 </div>
             }
@@ -192,23 +192,23 @@
                     <h2>@_selected.Deck.Name</h2>
                     <ManaColors Colors="@_selected.Colors" />
                     <span class="result-count">
-                        faltam @_selected.Needed.Total curingas · @_selected.OwnedFraction.ToString("P0") da lista já é sua
+                        @_selected.Needed.Total wildcards needed · @_selected.OwnedFraction.ToString("P0") of the list already yours
                     </span>
                     <div class="detail-actions">
                         @if (!string.IsNullOrWhiteSpace(_selected.Deck.Url))
                         {
                             <a href="@_selected.Deck.Url" target="_blank" rel="noopener">
-                                <button>Abrir origem</button>
+                                <button>Open source</button>
                             </a>
                         }
-                        <button class="primary" @onclick="CopyDeckAsync">@(_copied ? "Copiado!" : "Copiar para o Arena")</button>
-                        <button @onclick="() => Session.DeleteDeckAsync(_selected!.Deck.SourceId)">Remover</button>
+                        <button class="primary" @onclick="CopyDeckAsync">@(_copied ? "Copied!" : "Copy for Arena")</button>
+                        <button @onclick="() => Session.DeleteDeckAsync(_selected!.Deck.SourceId)">Remove</button>
                     </div>
                 </div>
 
                 <div class="card-columns">
                     <div>
-                        <div class="card-list-title">Deck principal</div>
+                        <div class="card-list-title">Mainboard</div>
                         @foreach (var gap in _selected.Gaps.Where(g => g.Board == DeckBoard.Main).OrderBy(g => g.CardName))
                         {
                             @RenderCardRow(gap)
@@ -227,7 +227,7 @@
                     }
 
                     <div>
-                        <div class="card-list-title">Exportar (formato do Arena)</div>
+                        <div class="card-list-title">Export (Arena format)</div>
                         <textarea class="export-area" readonly>@Session.ExportDeck(_selected.Deck)</textarea>
                     </div>
                 </div>
@@ -385,7 +385,7 @@
         <span class="card-name">@gap.CardName</span>
         @if (gap.Missing > 0)
         {
-            <span class="card-need @RarityClass(gap.Rarity)">faltam @gap.Missing</span>
+            <span class="card-need @RarityClass(gap.Rarity)">need @gap.Missing</span>
         }
     </div>;
 
