@@ -1,7 +1,7 @@
 # MTGA Collection Advisor
 
 Ranks MTG Arena decks by **how few wildcards you need to finish them**, based on the cards
-you actually own. Standard and Pioneer (Explorer).
+you actually own. Standard and Pioneer.
 
 ## Run it
 
@@ -48,7 +48,7 @@ approach this one is adapted from.
 - Windows only.
 - Archidekt lets anyone file any list under any format, so decks that aren't actually legal
   get filtered out — expect a chunk of each fetch to disappear.
-- Only Standard and Pioneer. Arena has no Pioneer queue; those decks are playable in Explorer.
+- Only Standard and Pioneer.
 
 ## Contributing
 
