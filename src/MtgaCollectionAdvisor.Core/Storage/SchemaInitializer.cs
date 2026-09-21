@@ -1,5 +1,3 @@
-using Npgsql;
-
 namespace MtgaCollectionAdvisor.Core.Storage;
 
 public static class SchemaInitializer
@@ -8,16 +6,16 @@ public static class SchemaInitializer
         CREATE TABLE IF NOT EXISTS collection_cards (
             grp_id     INTEGER PRIMARY KEY,
             quantity   INTEGER NOT NULL,
-            synced_at  TIMESTAMPTZ NOT NULL
+            synced_at  TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS wildcard_inventory (
-            id         SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+            id         INTEGER PRIMARY KEY CHECK (id = 1),
             commons    INTEGER NOT NULL,
             uncommons  INTEGER NOT NULL,
             rares      INTEGER NOT NULL,
             mythics    INTEGER NOT NULL,
-            synced_at  TIMESTAMPTZ NOT NULL
+            synced_at  TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS cards (
@@ -27,15 +25,15 @@ public static class SchemaInitializer
             mana_cost        TEXT NOT NULL,
             colors           TEXT NOT NULL,
             rarity           TEXT NOT NULL,
-            standard_legal   BOOLEAN NOT NULL,
-            pioneer_legal    BOOLEAN NOT NULL,
-            updated_at       TIMESTAMPTZ NOT NULL
+            standard_legal   INTEGER NOT NULL,
+            pioneer_legal    INTEGER NOT NULL,
+            updated_at       TEXT NOT NULL
         );
-        CREATE INDEX IF NOT EXISTS ix_cards_name ON cards (lower(name));
+        CREATE INDEX IF NOT EXISTS ix_cards_name ON cards (name COLLATE NOCASE);
 
         CREATE TABLE IF NOT EXISTS card_import_state (
-            id             SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-            last_imported  TIMESTAMPTZ NOT NULL
+            id             INTEGER PRIMARY KEY CHECK (id = 1),
+            last_imported  TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS decks (
@@ -44,7 +42,7 @@ public static class SchemaInitializer
             name         TEXT NOT NULL,
             url          TEXT NOT NULL,
             popularity   INTEGER NOT NULL,
-            fetched_at   TIMESTAMPTZ NOT NULL
+            fetched_at   TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS ix_decks_format ON decks (format_key);
 
@@ -57,10 +55,11 @@ public static class SchemaInitializer
         );
         """;
 
-    public static async Task EnsureCreatedAsync(NpgsqlDataSource dataSource, CancellationToken ct = default)
+    public static async Task EnsureCreatedAsync(Database database, CancellationToken ct = default)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(ct);
-        await using var command = new NpgsqlCommand(Sql, connection);
+        await using var connection = await database.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = Sql;
         await command.ExecuteNonQueryAsync(ct);
     }
 }

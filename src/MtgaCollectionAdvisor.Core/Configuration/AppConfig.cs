@@ -1,16 +1,12 @@
 namespace MtgaCollectionAdvisor.Core.Configuration;
 
 /// <summary>
-/// App-wide configuration. The Postgres instance reused here is the existing local
-/// "trust_postgres" dev container; this app gets its own database
-/// (mtga_collection_advisor) on that same server so it never touches other projects'
-/// tables.
+/// App-wide configuration. Data lives in a local SQLite file under the user's
+/// LocalApplicationData, so a published build needs no database server or setup.
 /// </summary>
-public sealed record AppConfig(string PostgresConnectionString, string? PlayerLogPathOverride)
+public sealed record AppConfig(string? DatabasePathOverride, string? PlayerLogPathOverride)
 {
     public static AppConfig Default { get; } = new(
-        PostgresConnectionString:
-            Environment.GetEnvironmentVariable("MTGA_ADVISOR_CONNSTRING")
-            ?? "Host=localhost;Port=5432;Database=mtga_collection_advisor;Username=trust_user;Password=trust_dev_pass",
+        DatabasePathOverride: Environment.GetEnvironmentVariable("MTGA_ADVISOR_DB_PATH"),
         PlayerLogPathOverride: Environment.GetEnvironmentVariable("MTGA_ADVISOR_PLAYERLOG_PATH"));
 }
