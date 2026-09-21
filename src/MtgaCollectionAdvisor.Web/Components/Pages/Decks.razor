@@ -33,7 +33,7 @@
                     <button class="@(Session.Format.Key == format.Key ? "active" : "")"
                             disabled="@Session.IsBusy"
                             @onclick="() => ChangeFormatAsync(format)">
-                        @(format.Key == "pioneer" ? "Pioneer" : format.DisplayName)
+                        @format.DisplayName
                     </button>
                 }
             </div>

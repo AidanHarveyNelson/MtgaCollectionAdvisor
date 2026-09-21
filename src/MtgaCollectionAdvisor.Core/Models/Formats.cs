@@ -1,9 +1,8 @@
 namespace MtgaCollectionAdvisor.Core.Models;
 
 /// <summary>
-/// A constructed format the advisor can rank decks for. "Pioneer" is mapped to the
-/// Scryfall "pioneer" legality list but results are restricted to cards that actually
-/// exist on Arena (there is no native Pioneer queue - Explorer is Arena's equivalent).
+/// A constructed format the advisor can rank decks for. Legality comes from Scryfall, but
+/// results are restricted to cards that actually exist on Arena.
 /// </summary>
 public sealed record FormatDefinition(
     string Key,
@@ -21,7 +20,7 @@ public static class Formats
 
     public static readonly FormatDefinition Pioneer = new(
         Key: "pioneer",
-        DisplayName: "Pioneer (Explorer no Arena)",
+        DisplayName: "Pioneer",
         ScryfallLegalityKey: "pioneer",
         MoxfieldFormatCode: "pioneer");
 
