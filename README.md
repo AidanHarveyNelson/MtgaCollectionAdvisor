@@ -50,11 +50,24 @@ approach this one is adapted from.
   get filtered out — expect a chunk of each fetch to disappear.
 - Only Standard and Pioneer. Arena has no Pioneer queue; those decks are playable in Explorer.
 
+## Contributing
+
+Issues and pull requests are welcome — feature requests included. If something is missing
+or broken, open an issue.
+
 ## Credits
+
+The memory-scanning approach comes from
+[MTGA-collection-exporter](https://github.com/NthPhantom10/MTGA-collection-exporter) by
+**NthPhantom10**, who worked out how to find the collection in the client's memory. This
+project is a C# port of that idea — thank you.
 
 Card data from [Scryfall](https://scryfall.com/docs/api) · decklists from
 [Archidekt](https://archidekt.com) · mana symbols from
-[mana-font](https://github.com/andrewgioia/mana-font) · memory scanning adapted from
-[MTGA-collection-exporter](https://github.com/NthPhantom10/MTGA-collection-exporter) (MIT).
+[mana-font](https://github.com/andrewgioia/mana-font).
 
-Unofficial fan project, not affiliated with Wizards of the Coast.
+See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for full licences.
+
+## Licence
+
+[MIT](LICENSE). Unofficial fan project, not affiliated with Wizards of the Coast.
