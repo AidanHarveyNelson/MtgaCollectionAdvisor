@@ -1,0 +1,76 @@
+@inject AdvisorSession Session
+
+@* Card-name input with autocomplete, plus the chosen cards as removable chips. *@
+
+<div class="card-picker">
+    <label class="picker-label" for="@_inputId">@Label</label>
+
+    <div class="picker-input">
+        <input id="@_inputId" type="text" autocomplete="off" placeholder="@Placeholder"
+               value="@_term"
+               @oninput="OnTermChangedAsync"
+               @onfocusout="HideSuggestionsSoon" />
+
+        @if (_suggestions.Count > 0)
+        {
+            <ul class="suggestions">
+                @foreach (var name in _suggestions)
+                {
+                    <li><button type="button" @onmousedown="() => AddAsync(name)">@name</button></li>
+                }
+            </ul>
+        }
+    </div>
+
+    @if (Cards.Count > 0)
+    {
+        <div class="chips">
+            @foreach (var card in Cards)
+            {
+                <span class="chip">
+                    @card
+                    <button type="button" title="Remove" @onclick="() => RemoveAsync(card)">×</button>
+                </span>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Placeholder { get; set; } = "Type a card name…";
+    [Parameter] public IReadOnlyList<string> Cards { get; set; } = [];
+    [Parameter] public EventCallback<IReadOnlyList<string>> CardsChanged { get; set; }
+
+    private readonly string _inputId = $"card-picker-{Guid.NewGuid():N}";
+    private string _term = "";
+    private IReadOnlyList<string> _suggestions = [];
+
+    private async Task OnTermChangedAsync(ChangeEventArgs e)
+    {
+        _term = e.Value?.ToString() ?? "";
+        _suggestions = await Session.SearchCardNamesAsync(_term);
+    }
+
+    private async Task AddAsync(string name)
+    {
+        _term = "";
+        _suggestions = [];
+
+        if (Cards.Any(c => c.Equals(name, StringComparison.OrdinalIgnoreCase))) return;
+
+        await CardsChanged.InvokeAsync([.. Cards, name]);
+    }
+
+    private Task RemoveAsync(string name) =>
+        CardsChanged.InvokeAsync(Cards.Where(c => !c.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList());
+
+    // Blur fires before the suggestion's click would, so the list is cleared on the next
+    // tick instead of immediately - otherwise picking a suggestion never registers.
+    private async Task HideSuggestionsSoon()
+    {
+        await Task.Delay(150);
+        _suggestions = [];
+        StateHasChanged();
+    }
+}

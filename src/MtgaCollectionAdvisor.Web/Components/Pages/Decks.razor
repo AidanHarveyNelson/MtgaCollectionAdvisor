@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject AdvisorSession Session
 @inject IJSRuntime JS
+@using MtgaCollectionAdvisor.Core.Analysis
 @using MtgaCollectionAdvisor.Core.Models
 
 <PageTitle>Recommended decks</PageTitle>
@@ -76,6 +77,12 @@
                        value="@_maxWildcards"
                        @onchange="e => _maxWildcards = int.TryParse(e.Value?.ToString(), out var v) ? v : null" />
             </div>
+        </div>
+
+        <div class="filter-group">
+            <div class="filter-title">Cards</div>
+            <CardPicker Label="Must include" Cards="_containsCards" CardsChanged="OnContainsChanged" />
+            <CardPicker Label="Must exclude" Cards="_excludesCards" CardsChanged="OnExcludesChanged" />
         </div>
 
         <div class="filter-group">
@@ -244,6 +251,8 @@
     private bool _onlyCraftable;
     private int? _maxWildcards;
     private string _search = string.Empty;
+    private IReadOnlyList<string> _containsCards = [];
+    private IReadOnlyList<string> _excludesCards = [];
 
     private SortKey _sortBy = SortKey.Wildcards;
     private bool _descending;
@@ -285,11 +294,28 @@
         _onlyCraftable = false;
         _maxWildcards = null;
         _search = string.Empty;
+        _containsCards = [];
+        _excludesCards = [];
         _page = 1;
     }
 
-    private bool HasActiveFilters =>
-        _selectedColors.Count > 0 || _onlyCraftable || _maxWildcards is not null || !string.IsNullOrWhiteSpace(_search);
+    // A card in both lists would make the filter unsatisfiable, so adding it to one
+    // side removes it from the other.
+    private void OnContainsChanged(IReadOnlyList<string> cards)
+    {
+        _containsCards = cards;
+        _excludesCards = _excludesCards.Where(c => !cards.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
+        _page = 1;
+    }
+
+    private void OnExcludesChanged(IReadOnlyList<string> cards)
+    {
+        _excludesCards = cards;
+        _containsCards = _containsCards.Where(c => !cards.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
+        _page = 1;
+    }
+
+    private bool HasActiveFilters => !BuildCriteria().IsEmpty;
 
     private void Sort(SortKey key)
     {
@@ -326,33 +352,23 @@
         }
     }
 
+    private DeckFilterCriteria BuildCriteria() => new()
+    {
+        Colors = _selectedColors,
+        ExactColors = _exactColors,
+        OnlyCraftable = _onlyCraftable,
+        MaxWildcards = _maxWildcards,
+        NameSearch = _search,
+        ContainsCards = _containsCards,
+        ExcludesCards = _excludesCards
+    };
+
     private List<DeckAnalysisResult> Filtered
     {
         get
         {
-            IEnumerable<DeckAnalysisResult> query = Session.Decks;
-
-            if (_selectedColors.Count > 0)
-            {
-                query = _exactColors
-                    ? query.Where(d => d.Colors.Length == _selectedColors.Count && d.Colors.All(_selectedColors.Contains))
-                    : query.Where(d => _selectedColors.All(c => d.Colors.Contains(c)));
-            }
-
-            if (_onlyCraftable)
-            {
-                query = query.Where(d => d.Needed.IsAffordableWith(Session.Collection.Wildcards));
-            }
-
-            if (_maxWildcards is { } max)
-            {
-                query = query.Where(d => d.Needed.Total <= max);
-            }
-
-            if (!string.IsNullOrWhiteSpace(_search))
-            {
-                query = query.Where(d => d.Deck.Name.Contains(_search, StringComparison.OrdinalIgnoreCase));
-            }
+            IEnumerable<DeckAnalysisResult> query =
+                DeckFilter.Apply(Session.Decks, BuildCriteria(), Session.Collection.Wildcards);
 
             query = (_sortBy, _descending) switch
             {
