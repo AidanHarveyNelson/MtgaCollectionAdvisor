@@ -38,7 +38,7 @@ public sealed class ArchidektClient(HttpClient httpClient)
     {
         if (!FormatIds.TryGetValue(format.Key, out var formatId))
         {
-            throw new ArchidektUnavailableException($"Formato {format.DisplayName} não é suportado pela Archidekt.");
+            throw new ArchidektUnavailableException($"Archidekt does not support the {format.DisplayName} format.");
         }
 
         ArchidektSearchResponse? search;
@@ -50,13 +50,13 @@ public sealed class ArchidektClient(HttpClient httpClient)
         catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
         {
             throw new ArchidektUnavailableException(
-                $"Não foi possível buscar decks da Archidekt para {format.DisplayName}.", ex);
+                $"Could not fetch {format.DisplayName} decks from Archidekt.", ex);
         }
 
         var candidates = (search?.Results ?? []).Where(r => !r.Private && !r.Unlisted).ToList();
         if (candidates.Count == 0)
         {
-            throw new ArchidektUnavailableException($"A Archidekt não retornou decks públicos para {format.DisplayName}.");
+            throw new ArchidektUnavailableException($"Archidekt returned no public {format.DisplayName} decks.");
         }
 
         var fetchedAt = DateTimeOffset.UtcNow;
@@ -71,7 +71,7 @@ public sealed class ArchidektClient(HttpClient httpClient)
         if (decks.Count == 0)
         {
             throw new ArchidektUnavailableException(
-                $"A Archidekt listou decks para {format.DisplayName}, mas nenhum pôde ser lido em detalhe.");
+                $"Archidekt listed {format.DisplayName} decks, but none could be read in detail.");
         }
 
         return decks;

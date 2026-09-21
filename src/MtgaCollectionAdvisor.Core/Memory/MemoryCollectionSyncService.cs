@@ -56,7 +56,7 @@ public sealed class MemoryCollectionSyncService(
         if (knownIds.Count == 0)
         {
             throw new MemoryScanException(
-                "A base de cartas está vazia. Clique em \"Atualizar cartas (Scryfall)\" antes de escanear.");
+                "The card database is empty. Click \"Update cards\" before scanning.");
         }
 
         var scanner = new CollectionMemoryScanner();

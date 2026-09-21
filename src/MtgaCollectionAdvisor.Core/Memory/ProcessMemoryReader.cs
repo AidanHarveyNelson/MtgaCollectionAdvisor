@@ -26,7 +26,7 @@ public sealed class ProcessMemoryReader : IDisposable
     {
         var process = Process.GetProcessesByName(processName).FirstOrDefault()
             ?? throw new MemoryScanException(
-                $"O processo \"{processName}\" não está em execução. Abra o MTG Arena antes de escanear.");
+                $"The \"{processName}\" process is not running. Start MTG Arena before scanning.");
 
         var handle = NativeMethods.OpenProcess(
             NativeMethods.PROCESS_QUERY_INFORMATION | NativeMethods.PROCESS_VM_READ, false, process.Id);
@@ -35,8 +35,8 @@ public sealed class ProcessMemoryReader : IDisposable
         {
             var error = Marshal.GetLastWin32Error();
             throw new MemoryScanException(
-                "Não foi possível abrir o processo do MTG Arena para leitura " +
-                $"({new Win32Exception(error).Message}). Tente executar este aplicativo como Administrador.");
+                "Could not open the MTG Arena process for reading " +
+                $"({new Win32Exception(error).Message}). Try running this app as Administrator.");
         }
 
         return new ProcessMemoryReader(handle, process.Id);

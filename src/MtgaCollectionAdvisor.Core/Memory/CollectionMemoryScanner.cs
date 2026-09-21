@@ -70,27 +70,27 @@ public sealed class CollectionMemoryScanner
                 r.BaseAddress == hintRegion.BaseAddress && r.Size == hintRegion.Size);
             if (stillMapped is not null)
             {
-                progress?.Report("Tentando a região onde a coleção estava da última vez...");
+                progress?.Report("Trying the region the collection was in last time...");
                 var quick = SweepRegions(reader, [stillMapped], [2, 3, 4], knownArenaIds, progress, ct);
                 var quickBest = RankCollectionCandidates(quick, knownArenaIds).FirstOrDefault();
                 if (quickBest is not null)
                 {
-                    progress?.Report($"Coleção reencontrada rapidamente: {quickBest.Block.Count} cartas distintas.");
+                    progress?.Report($"Collection found again quickly: {quickBest.Block.Count} distinct cards.");
                     return new MemoryScanResult(quickBest.Block, quickBest.Duplicates, quickBest.KnownRatio,
-                        new CollectionAnchor(0, 0, "varredura automática"), stillMapped);
+                        new CollectionAnchor(0, 0, "automatic sweep"), stillMapped);
                 }
-                progress?.Report("Região antiga não serve mais; varrendo tudo.");
+                progress?.Report("That region no longer holds it; sweeping everything.");
             }
         }
 
         var totalBytes = regions.Sum(r => r.Size);
-        progress?.Report($"{regions.Count} regiões, {totalBytes / (1024 * 1024)} MB para varrer.");
+        progress?.Report($"{regions.Count} regions, {totalBytes / (1024 * 1024)} MB to sweep.");
 
         // Each chunk is decoded with every stride/offset in one pass: stride 2 is a packed
         // pair array, stride 4 offset 2 is a .NET Dictionary<int,int> entry table
         // ({hash, next, key, value}), stride 3 covers 12-byte structs.
         var allCandidates = SweepRegions(reader, regions, [2, 3, 4], knownArenaIds, progress, ct);
-        progress?.Report($"{allCandidates.Count} blocos candidatos.");
+        progress?.Report($"{allCandidates.Count} candidate blocks.");
 
         var best = RankCollectionCandidates(allCandidates, knownArenaIds).FirstOrDefault();
         if (best is null) return null;
@@ -98,12 +98,12 @@ public sealed class CollectionMemoryScanner
         var bestRegion = allCandidates.FirstOrDefault(c => ReferenceEquals(c.Block, best.Block))?.Region;
 
         progress?.Report(
-            $"Coleção encontrada: {best.Block.Count} cartas distintas " +
-            $"({best.KnownRatio:P0} de ids reconhecidos, {best.MultiCopyRatio:P0} com 2+ cópias).");
+            $"Collection found: {best.Block.Count} distinct cards " +
+            $"({best.KnownRatio:P0} known ids, {best.MultiCopyRatio:P0} with 2+ copies).");
 
         return new MemoryScanResult(
             best.Block, best.Duplicates, best.KnownRatio,
-            new CollectionAnchor(0, 0, "varredura automática"), bestRegion);
+            new CollectionAnchor(0, 0, "automatic sweep"), bestRegion);
     }
 
     public sealed record ScoredBlock(
@@ -202,7 +202,7 @@ public sealed class CollectionMemoryScanner
             scanned++;
             if (scanned % 400 == 0)
             {
-                progress?.Report($"Varrendo... ({scanned}/{regions.Count} regiões, {candidates.Count} blocos)");
+                progress?.Report($"Sweeping... ({scanned}/{regions.Count} regions, {candidates.Count} blocks)");
             }
 
             // Chunks overlap so a collection table sitting across a chunk boundary is
@@ -244,25 +244,25 @@ public sealed class CollectionMemoryScanner
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
-        if (anchors.Count == 0) throw new MemoryScanException("Informe pelo menos uma carta âncora.");
+        if (anchors.Count == 0) throw new MemoryScanException("Provide at least one anchor card.");
 
         using var reader = ProcessMemoryReader.Open(MtgaProcessName);
         var regions = reader.EnumerateWritableRegions().ToList();
-        progress?.Report($"{regions.Count} regiões de memória para varrer.");
+        progress?.Report($"{regions.Count} memory regions to sweep.");
 
         foreach (var anchor in anchors.OrderByDescending(a => a.Quantity))
         {
             ct.ThrowIfCancellationRequested();
-            progress?.Report($"Procurando âncora: {anchor.Name} x{anchor.Quantity}...");
+            progress?.Report($"Looking for anchor: {anchor.Name} x{anchor.Quantity}...");
 
             var hits = FindPattern(reader, regions, anchor, progress, ct);
             if (hits.Count == 0)
             {
-                progress?.Report($"Nenhuma ocorrência de {anchor.Name} x{anchor.Quantity}.");
+                progress?.Report($"No match for {anchor.Name} x{anchor.Quantity}.");
                 continue;
             }
 
-            progress?.Report($"{hits.Count} ocorrência(s). Extraindo blocos...");
+            progress?.Report($"{hits.Count} match(es). Extracting blocks...");
 
             var candidates = new List<(Dictionary<int, int> Block, int Duplicates)>();
             foreach (var hit in hits)
@@ -273,18 +273,18 @@ public sealed class CollectionMemoryScanner
 
             if (candidates.Count == 0)
             {
-                progress?.Report("Nenhum bloco de dados válido perto das ocorrências.");
+                progress?.Report("No valid data block near the matches.");
                 continue;
             }
 
-            progress?.Report($"Pontuando {candidates.Count} blocos candidatos...");
+            progress?.Report($"Scoring {candidates.Count} candidate blocks...");
             var best = SelectBest(candidates, anchors, knownArenaIds);
             if (best is null) continue;
 
             var (block, duplicates) = best.Value;
             if (!IsValid(block, duplicates, knownArenaIds, out var knownRatio))
             {
-                progress?.Report("Melhor bloco não passou na validação. Tentando próxima âncora...");
+                progress?.Report("Best block failed validation. Trying the next anchor...");
                 continue;
             }
 
@@ -294,7 +294,7 @@ public sealed class CollectionMemoryScanner
                 if (block.ContainsKey(a.GrpId)) block[a.GrpId] = a.Quantity;
             }
 
-            progress?.Report($"Coleção encontrada: {block.Count} cartas distintas.");
+            progress?.Report($"Collection found: {block.Count} distinct cards.");
             return new MemoryScanResult(block, duplicates, knownRatio, anchor);
         }
 
@@ -324,7 +324,7 @@ public sealed class CollectionMemoryScanner
             scannedRegions++;
             if (scannedRegions % 500 == 0)
             {
-                progress?.Report($"Varrendo memória... ({scannedRegions}/{regions.Count} regiões, {hits.Count} ocorrências)");
+                progress?.Report($"Sweeping memory... ({scannedRegions}/{regions.Count} regions, {hits.Count} matches)");
             }
 
             for (long offset = 0; offset < region.Size; offset += ChunkBytes - patternArray.Length)

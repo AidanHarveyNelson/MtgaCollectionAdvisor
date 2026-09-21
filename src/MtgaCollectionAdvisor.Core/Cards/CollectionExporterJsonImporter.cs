@@ -30,7 +30,7 @@ public sealed class CollectionExporterJsonImporter(CollectionStore collectionSto
     {
         var file = System.Text.Json.JsonSerializer.Deserialize<ExporterCollectionFile>(
             json, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))
-            ?? throw new InvalidOperationException("Arquivo de coleção inválido ou vazio.");
+            ?? throw new InvalidOperationException("Collection file is invalid or empty.");
 
         var ownedByGrpId = new Dictionary<int, int>();
         foreach (var entry in file.Cards)
