@@ -127,6 +127,69 @@ public class DeckFilterTests
     }
 
     [Fact]
+    public void Apply_Should_DropUnplayableDecks_When_IncludeUnplayableIsFalse()
+    {
+        var playable = Deck("Playable", "R", ["Mountain"]);
+        var unplayable = Deck("Not On Arena", "R", ["Mountain"], unavailableOnArena: ["Mosswood Dreadknight"]);
+
+        var result = DeckFilter.Apply([playable, unplayable], new DeckFilterCriteria(), EmptyWallet);
+
+        Assert.Single(result);
+        Assert.Equal("Playable", result[0].Deck.Name);
+    }
+
+    [Fact]
+    public void Apply_Should_DropIllegalDecks_When_IncludeUnplayableIsFalse()
+    {
+        var legal = Deck("Legal", "R", ["Mountain"]);
+        var illegal = Deck("Rotated Out", "R", ["Mountain"], illegalInFormat: ["Lightning Bolt"]);
+
+        var result = DeckFilter.Apply([legal, illegal], new DeckFilterCriteria(), EmptyWallet);
+
+        Assert.Single(result);
+        Assert.Equal("Legal", result[0].Deck.Name);
+    }
+
+    [Fact]
+    public void Apply_Should_KeepUnplayableDecks_When_IncludeUnplayableIsSet()
+    {
+        var unavailable = Deck("Not On Arena", "R", ["Mountain"], unavailableOnArena: ["Mosswood Dreadknight"]);
+        var illegal = Deck("Rotated Out", "R", ["Mountain"], illegalInFormat: ["Lightning Bolt"]);
+
+        var criteria = new DeckFilterCriteria { IncludeUnplayable = true };
+        var result = DeckFilter.Apply([unavailable, illegal], criteria, EmptyWallet);
+
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public void Apply_Should_StillNarrowUnplayableDecks_When_OtherFiltersAreSet()
+    {
+        // Keeping unplayable decks must not exempt them from the user's actual filters.
+        var boros = Deck("Boros", "WR", ["Plains"], unavailableOnArena: ["Some Card"]);
+        var mono = Deck("Mono Blue", "U", ["Island"], unavailableOnArena: ["Some Card"]);
+
+        var criteria = new DeckFilterCriteria
+        {
+            IncludeUnplayable = true,
+            Colors = new HashSet<char> { 'W' }
+        };
+
+        var result = DeckFilter.Apply([boros, mono], criteria, EmptyWallet);
+
+        Assert.Single(result);
+        Assert.Equal("Boros", result[0].Deck.Name);
+    }
+
+    [Fact]
+    public void IsEmpty_Should_BeTrue_When_OnlyIncludeUnplayableIsSet()
+    {
+        // Which list is being shown is not a filter the user picked, so it must not
+        // offer them a "clear filters" link.
+        Assert.True(new DeckFilterCriteria { IncludeUnplayable = true }.IsEmpty);
+    }
+
+    [Fact]
     public void Apply_Should_KeepOnlyPinnedDecks_When_OnlyPinnedIsSet()
     {
         var tracked = Deck("Tracked", "R", ["Mountain"]);
@@ -158,7 +221,9 @@ public class DeckFilterTests
         string colors,
         IReadOnlyList<string> cards,
         IReadOnlyList<string>? sideboard = null,
-        int rares = 0)
+        int rares = 0,
+        IReadOnlyList<string>? unavailableOnArena = null,
+        IReadOnlyList<string>? illegalInFormat = null)
     {
         var refs = cards.Select(c => new DeckCardRef(c, 4, DeckBoard.Main))
             .Concat((sideboard ?? []).Select(c => new DeckCardRef(c, 2, DeckBoard.Sideboard)))
@@ -179,8 +244,8 @@ public class DeckFilterTests
             OwnedCopies: 0,
             TotalCopies: refs.Sum(c => c.Quantity),
             Gaps: [],
-            UnavailableOnArena: [],
-            IllegalInFormat: [],
+            UnavailableOnArena: unavailableOnArena ?? [],
+            IllegalInFormat: illegalInFormat ?? [],
             Colors: colors);
     }
 }

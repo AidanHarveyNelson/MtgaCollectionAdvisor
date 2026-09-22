@@ -130,15 +130,33 @@ public sealed class CardDatabaseStore(Database database)
     private static string Escape(string term) =>
         term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 
+    /// <summary>
+    /// Every Arena printing of a card, by name.
+    ///
+    /// Double-faced cards are stored under their full "Front // Back" name, but Arena's
+    /// own export format - the format decklists are pasted in - writes only the front
+    /// face. So a bare name also matches anything filed as "that name // something", or
+    /// a deck loses the card entirely and, with it, its whole analysis.
+    ///
+    /// The front-face branch can in principle over-match (asking for "Fire" would also
+    /// find "Fire // Ice"), which is accepted: Arena exports split cards under their full
+    /// name, so it does not arise in practice, and matching too much beats dropping a
+    /// deck. Back-face names are not matched - Arena never writes them.
+    /// </summary>
     public async Task<IReadOnlyList<CardInfo>> FindByNameAsync(string name, CancellationToken ct = default)
     {
         await using var connection = await database.OpenAsync(ct);
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal
-            FROM cards WHERE name = $name COLLATE NOCASE
+            FROM cards
+            WHERE name = $name COLLATE NOCASE
+               OR name LIKE $frontFace ESCAPE '\' COLLATE NOCASE
             """;
         command.Parameters.AddWithValue("$name", name);
+        // The name comes from a pasted decklist, so neutralise LIKE's own wildcards
+        // before appending ours - an unescaped % would match the whole table.
+        command.Parameters.AddWithValue("$frontFace", Escape(name) + " // %");
 
         var results = new List<CardInfo>();
         await using var reader = await command.ExecuteReaderAsync(ct);
