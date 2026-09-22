@@ -23,7 +23,9 @@
     return;
 }
 
-<div class="workspace">
+<div class="workspace @(_showFilters ? "filters-open" : "")">
+    <div class="filters-backdrop" @onclick="() => _showFilters = false"></div>
+
     <aside class="panel filters">
         <div class="filter-group">
             <div class="filter-title">Format</div>
@@ -102,7 +104,19 @@
     <section>
         <div class="panel">
             <div class="list-header">
-                <h2>Recommended decks</h2>
+                <div class="list-title">
+                    <button type="button" class="filters-toggle" aria-expanded="@_showFilters"
+                            title="Show the filters" @onclick="() => _showFilters = !_showFilters">
+                        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                            <path fill="currentColor" d="M1.5 3.25a.75.75 0 0 1 .75-.75h11.5a.75.75 0 0 1 0
+                                1.5H2.25a.75.75 0 0 1-.75-.75Zm2 4.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0
+                                1.5h-7.5a.75.75 0 0 1-.75-.75Zm2 4.5a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0
+                                1.5h-3.5a.75.75 0 0 1-.75-.75Z" />
+                        </svg>
+                        Filters
+                    </button>
+                    <h2>Recommended decks</h2>
+                </div>
                 <span class="result-count">
                     @Filtered.Count of @Session.Decks.Count decks
                     @if (HasActiveFilters)
@@ -135,8 +149,8 @@
                             <th class="sortable @SortClass(SortKey.Name)" @onclick="() => Sort(SortKey.Name)">Deck</th>
                             <th>Colours</th>
                             <th class="sortable num @SortClass(SortKey.Wildcards)" @onclick="() => Sort(SortKey.Wildcards)">Wildcards</th>
-                            <th>Breakdown</th>
-                            <th class="sortable @SortClass(SortKey.Owned)" @onclick="() => Sort(SortKey.Owned)">Owned</th>
+                            <th class="col-breakdown">Breakdown</th>
+                            <th class="sortable col-owned @SortClass(SortKey.Owned)" @onclick="() => Sort(SortKey.Owned)">Owned</th>
                             <th>Craftable</th>
                         </tr>
                     </thead>
@@ -148,11 +162,10 @@
                                     <button class="pin @(Session.IsPinned(deck.Deck.SourceId) ? "on" : "")"
                                             title="@(Session.IsPinned(deck.Deck.SourceId) ? "Unpin" : "Pin to track progress")"
                                             @onclick="() => Session.TogglePinAsync(deck)">
-                                        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-                                            <path fill="currentColor" d="M9.5 1a.75.75 0 0 0-.75.75v.5c0 .2.08.39.22.53l.28.28-1.1 3.3-2.9 1.45a1.25 1.25 0
-                                                0 0-.36 1.97l1.86 1.86-2.28 3.42a.5.5 0 0 0 .69.69l3.42-2.28 1.86 1.86a1.25 1.25 0 0 0
-                                                1.97-.36l1.45-2.9 3.3-1.1.28.28c.14.14.33.22.53.22h.5a.75.75 0 0 0 0-1.5h-.19L9.69 1.19A.75.75
-                                                0 0 0 9.5 1Z" />
+                                        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                                            <path fill="currentColor" d="M5.75 1.5a1 1 0 0 0 0 2h.85v3.1L4.5 8.7A2.2 2.2 0 0 0 3.8
+                                                10.3V11h3.45L7.72 14.62a.3.3 0 0 0 .56 0L8.75 11h3.45v-.7a2.2 2.2 0 0 0-.7-1.6L9.4
+                                                6.6V3.5h.85a1 1 0 0 0 0-2Z" />
                                         </svg>
                                     </button>
                                 </td>
@@ -172,7 +185,7 @@
                                 <td class="num">
                                     <span class="wc-total @(deck.Needed.Total == 0 ? "zero" : "")">@deck.Needed.Total</span>
                                 </td>
-                                <td>
+                                <td class="col-breakdown">
                                     <div class="wc-breakdown">
                                         <span class="@(deck.Needed.Commons > 0 ? "c" : "off")">@deck.Needed.Commons C</span>
                                         <span class="@(deck.Needed.Uncommons > 0 ? "u" : "off")">@deck.Needed.Uncommons U</span>
@@ -180,7 +193,7 @@
                                         <span class="@(deck.Needed.Mythics > 0 ? "m" : "off")">@deck.Needed.Mythics M</span>
                                     </div>
                                 </td>
-                                <td>
+                                <td class="col-owned">
                                     <div class="owned-cell">
                                         <div class="owned-bar"><div style="width:@((deck.OwnedFraction * 100).ToString("F0"))%"></div></div>
                                         <span class="owned-value">@deck.OwnedFraction.ToString("P0")</span>
@@ -289,6 +302,9 @@
 
     private DeckAnalysisResult? _selected;
     private bool _copied;
+
+    /// <summary>Only meaningful in the narrow layout, where the filters live in a drawer.</summary>
+    private bool _showFilters;
 
     protected override void OnInitialized() => Session.Changed += OnSessionChanged;
 
