@@ -135,6 +135,21 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
             ? Task.FromResult<IReadOnlyList<string>>([])
             : services.CardDatabaseStore.SearchNamesAsync(term);
 
+    /// <summary>
+    /// The deck imported most recently into the current format, so the UI can take the
+    /// user to where it landed rather than leaving them on a list that did not move.
+    /// Read once, via <see cref="ConsumeLastImport"/>.
+    /// </summary>
+    public string? LastImportedSourceId { get; private set; }
+
+    /// <summary>Returns the last import and forgets it, so it is acted on exactly once.</summary>
+    public string? ConsumeLastImport()
+    {
+        var sourceId = LastImportedSourceId;
+        LastImportedSourceId = null;
+        return sourceId;
+    }
+
     /// <summary>Adds a deck pasted by hand (Arena export format) to the candidate pool.</summary>
     public Task ImportDeckAsync(string name, FormatDefinition format, string decklist) =>
         RunAsync("Importing deck", async report =>
@@ -147,7 +162,7 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
             }
 
             var deck = new CandidateDeck(
-                SourceId: $"manual:{Guid.NewGuid()}",
+                SourceId: $"{CandidateDeck.ManualSourcePrefix}{Guid.NewGuid()}",
                 Name: name,
                 Url: "",
                 FormatKey: format.Key,
@@ -156,9 +171,20 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
                 FetchedAt: DateTimeOffset.UtcNow);
 
             await services.CuratedDeckStore.AddDeckAsync(deck);
-            report($"Deck \"{name}\" imported ({cards.Count} lines).");
 
-            if (format.Key == Format.Key) await ReloadRankingAsync();
+            if (format.Key == Format.Key)
+            {
+                LastImportedSourceId = deck.SourceId;
+                report($"Deck \"{name}\" imported ({cards.Count} lines).");
+                await ReloadRankingAsync();
+            }
+            else
+            {
+                // Saying nothing here would look identical to the import failing: the
+                // list on screen is for the other format and does not move.
+                report($"Deck \"{name}\" imported into {format.DisplayName} " +
+                       $"({cards.Count} lines). Switch the format to see it.");
+            }
         });
 
     private async Task ReloadRankingAsync()

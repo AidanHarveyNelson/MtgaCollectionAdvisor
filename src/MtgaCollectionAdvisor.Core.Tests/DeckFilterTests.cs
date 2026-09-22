@@ -190,6 +190,95 @@ public class DeckFilterTests
     }
 
     [Fact]
+    public void IsEmpty_Should_BeTrue_When_OnlySourceIsSet()
+    {
+        Assert.True(new DeckFilterCriteria { Source = DeckSourceFilter.User }.IsEmpty);
+    }
+
+    [Fact]
+    public void IsUserDeck_Should_FollowTheSourceIdPrefix()
+    {
+        Assert.True(Deck("Mine", "R", ["Mountain"], userDeck: true).Deck.IsUserDeck);
+        Assert.False(Deck("Theirs", "R", ["Mountain"]).Deck.IsUserDeck);
+    }
+
+    [Fact]
+    public void Apply_Should_ReturnOnlyUserDecks_When_SourceIsUser()
+    {
+        var mine = Deck("Mine", "R", ["Mountain"], userDeck: true);
+        var theirs = Deck("Theirs", "R", ["Mountain"]);
+
+        var criteria = new DeckFilterCriteria { Source = DeckSourceFilter.User };
+        var result = DeckFilter.Apply([mine, theirs], criteria, EmptyWallet);
+
+        Assert.Single(result);
+        Assert.Equal("Mine", result[0].Deck.Name);
+    }
+
+    [Fact]
+    public void Apply_Should_ReturnOnlyFetchedDecks_When_SourceIsFetched()
+    {
+        var mine = Deck("Mine", "R", ["Mountain"], userDeck: true);
+        var theirs = Deck("Theirs", "R", ["Mountain"]);
+
+        var criteria = new DeckFilterCriteria { Source = DeckSourceFilter.Fetched };
+        var result = DeckFilter.Apply([mine, theirs], criteria, EmptyWallet);
+
+        Assert.Single(result);
+        Assert.Equal("Theirs", result[0].Deck.Name);
+    }
+
+    [Fact]
+    public void Apply_Should_ReturnBothSources_When_SourceIsAny()
+    {
+        var mine = Deck("Mine", "R", ["Mountain"], userDeck: true);
+        var theirs = Deck("Theirs", "R", ["Mountain"]);
+
+        var result = DeckFilter.Apply([mine, theirs], new DeckFilterCriteria(), EmptyWallet);
+
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public void Apply_Should_KeepUnplayableUserDeck_When_ShowingTheUserDecksTab()
+    {
+        // The exact combination the User decks tab uses, and the whole point of #11:
+        // an imported deck naming a card that is not on Arena must still be listed.
+        var brokenUserDeck = Deck(
+            "Golgari pest", "BG", ["Swamp"], userDeck: true, unavailableOnArena: ["Mosswood Dreadknight"]);
+        var fetched = Deck("Theirs", "R", ["Mountain"]);
+
+        var criteria = new DeckFilterCriteria
+        {
+            Source = DeckSourceFilter.User,
+            IncludeUnplayable = true
+        };
+
+        var result = DeckFilter.Apply([brokenUserDeck, fetched], criteria, EmptyWallet);
+
+        Assert.Single(result);
+        Assert.Equal("Golgari pest", result[0].Deck.Name);
+    }
+
+    [Fact]
+    public void Apply_Should_HideUserDecks_When_ShowingTheSuggestionsTab()
+    {
+        var mine = Deck("Mine", "R", ["Mountain"], userDeck: true);
+        var theirs = Deck("Theirs", "R", ["Mountain"]);
+
+        var criteria = new DeckFilterCriteria
+        {
+            Source = DeckSourceFilter.Fetched,
+            IncludeUnplayable = false
+        };
+
+        var result = DeckFilter.Apply([mine, theirs], criteria, EmptyWallet);
+
+        Assert.Single(result);
+        Assert.Equal("Theirs", result[0].Deck.Name);
+    }
+
+    [Fact]
     public void Apply_Should_KeepOnlyPinnedDecks_When_OnlyPinnedIsSet()
     {
         var tracked = Deck("Tracked", "R", ["Mountain"]);
@@ -223,14 +312,15 @@ public class DeckFilterTests
         IReadOnlyList<string>? sideboard = null,
         int rares = 0,
         IReadOnlyList<string>? unavailableOnArena = null,
-        IReadOnlyList<string>? illegalInFormat = null)
+        IReadOnlyList<string>? illegalInFormat = null,
+        bool userDeck = false)
     {
         var refs = cards.Select(c => new DeckCardRef(c, 4, DeckBoard.Main))
             .Concat((sideboard ?? []).Select(c => new DeckCardRef(c, 2, DeckBoard.Sideboard)))
             .ToList();
 
         var candidate = new CandidateDeck(
-            SourceId: $"test:{name}",
+            SourceId: userDeck ? $"{CandidateDeck.ManualSourcePrefix}{name}" : $"archidekt:{name}",
             Name: name,
             Url: "",
             FormatKey: Formats.Standard.Key,

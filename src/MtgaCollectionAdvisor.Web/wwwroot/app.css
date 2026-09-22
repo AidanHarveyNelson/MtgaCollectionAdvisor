@@ -307,6 +307,44 @@ input[type="text"], input[type="number"], select {
 
 .result-count { color: var(--text-muted); font-size: 13px; }
 
+/* Which list is on screen. Sits where the heading used to, so it reads as the title. */
+.tabs { display: flex; gap: var(--space-1); }
+
+.tabs button {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 15px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tabs button:hover:not(.active) { background: var(--surface-hover); border-color: transparent; color: var(--text); }
+.tabs button.active { background: var(--accent-soft); color: var(--accent); }
+
+.tab-count {
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--surface-raised);
+    color: var(--text-muted);
+}
+
+.tabs button.active .tab-count { background: var(--accent); color: #1a1204; }
+
+/* Why a deck cannot be played. Only the User decks tab keeps such decks. */
+.deck-warning {
+    font-size: 12px;
+    color: var(--warning);
+    margin-top: 2px;
+}
+
 .deck-table { width: 100%; border-collapse: collapse; }
 
 .deck-table th {

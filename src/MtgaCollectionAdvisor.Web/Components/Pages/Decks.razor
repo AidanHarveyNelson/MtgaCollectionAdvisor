@@ -115,7 +115,22 @@
                         </svg>
                         Filters
                     </button>
-                    <h2>Recommended decks</h2>
+                    <div class="tabs" role="tablist">
+                        <button role="tab" class="@(_tab == DeckTab.Suggestions ? "active" : "")"
+                                aria-selected="@(_tab == DeckTab.Suggestions)"
+                                @onclick="() => ShowTab(DeckTab.Suggestions)">
+                            Suggestions
+                        </button>
+                        <button role="tab" class="@(_tab == DeckTab.User ? "active" : "")"
+                                aria-selected="@(_tab == DeckTab.User)"
+                                @onclick="() => ShowTab(DeckTab.User)">
+                            User decks
+                            @if (UserDeckCount > 0)
+                            {
+                                <span class="tab-count">@UserDeckCount</span>
+                            }
+                        </button>
+                    </div>
                 </div>
                 <span class="result-count">
                     @Filtered.Count of @Available.Count decks
@@ -126,7 +141,17 @@
                 </span>
             </div>
 
-            @if (Session.Decks.Count == 0)
+            @if (_tab == DeckTab.User && Available.Count == 0)
+            {
+                <div class="empty">
+                    <h3>No decks of your own yet</h3>
+                    <p>
+                        Click <strong>Import deck</strong> to paste a list in Arena's export format.
+                        Your decks stay here whatever happens to the fetched pool.
+                    </p>
+                </div>
+            }
+            else if (Session.Decks.Count == 0)
             {
                 <div class="empty">
                     <h3>No decks loaded</h3>
@@ -185,7 +210,14 @@
                                 <td>
                                     <div class="deck-name">@deck.Deck.Name</div>
                                     <div class="deck-meta">
-                                        @deck.Deck.Popularity.ToString("N0") views
+                                        @if (deck.Deck.IsUserDeck)
+                                        {
+                                            <text>Imported @deck.Deck.FetchedAt.LocalDateTime.ToString("d MMM yyyy")</text>
+                                        }
+                                        else
+                                        {
+                                            <text>@deck.Deck.Popularity.ToString("N0") views</text>
+                                        }
                                         @if (Progress(deck) is { } moved && moved != 0)
                                         {
                                             <span class="progress @(moved > 0 ? "down" : "up")">
@@ -193,6 +225,15 @@
                                             </span>
                                         }
                                     </div>
+                                    @* Only reachable on the User decks tab - Suggestions drops these. *@
+                                    @if (deck.UnavailableOnArena.Count > 0)
+                                    {
+                                        <div class="deck-warning">Not on Arena: @string.Join(", ", deck.UnavailableOnArena)</div>
+                                    }
+                                    @if (deck.IllegalInFormat.Count > 0)
+                                    {
+                                        <div class="deck-warning">Not legal in @Session.Format.DisplayName: @string.Join(", ", deck.IllegalInFormat)</div>
+                                    }
                                 </td>
                                 <td><ManaColors Colors="@deck.Colors" /></td>
                                 <td class="num">
@@ -299,6 +340,8 @@
 @code {
     private enum SortKey { Wildcards, Owned, Name }
 
+    private enum DeckTab { Suggestions, User }
+
     private readonly HashSet<char> _selectedColors = [];
     private bool _exactColors;
     private bool _onlyCraftable;
@@ -315,6 +358,7 @@
 
     private DeckAnalysisResult? _selected;
     private bool _copied;
+    private DeckTab _tab = DeckTab.Suggestions;
 
     /// <summary>Only meaningful in the narrow layout, where the filters live in a drawer.</summary>
     private bool _showFilters;
@@ -328,9 +372,29 @@
         {
             _selected = Session.Decks.FirstOrDefault(d => d.Deck.SourceId == _selected.Deck.SourceId);
         }
+
+        // A deck that was just imported only lives on the other tab, and leaving the user
+        // on Suggestions would look exactly like the import having failed. The row itself
+        // is enough: it sorts to the top of a short list. Opening its detail as well would
+        // put what they want at the bottom of the page (see #15).
+        if (Session.ConsumeLastImport() is not null)
+        {
+            _tab = DeckTab.User;
+            _selected = null;
+        }
+
         _page = 1;
         StateHasChanged();
     });
+
+    private void ShowTab(DeckTab tab)
+    {
+        if (_tab == tab) return;
+
+        _tab = tab;
+        _page = 1;
+        _selected = null; // the selection belongs to the tab it was picked from
+    }
 
     private async Task ChangeFormatAsync(FormatDefinition format)
     {
@@ -422,10 +486,12 @@
         OnlyPinned = _onlyPinned,
         PinnedSourceIds = Session.Pins.Keys.ToHashSet(),
 
-        // Suggestions only: a list someone else filed under this format is worth nothing
-        // if it is not actually legal or not all on Arena. The user's own decks get their
-        // own list (#11), which turns this on.
-        IncludeUnplayable = false
+        Source = _tab == DeckTab.User ? DeckSourceFilter.User : DeckSourceFilter.Fetched,
+
+        // A list someone else filed under this format is worth nothing if it is not
+        // actually legal or not all on Arena. A deck the user typed in is worth showing
+        // regardless - they asked for it, and the row says what is wrong with it.
+        IncludeUnplayable = _tab == DeckTab.User
     };
 
     /// <summary>Wildcards saved since the deck was pinned; positive means closer to done.</summary>
@@ -439,11 +505,19 @@
     /// Session.Decks now carries decks that are illegal or not all on Arena, and counting
     /// those would read as "your filters are hiding 41 decks" when they are not.
     /// </summary>
-    private List<DeckAnalysisResult> Available =>
-        DeckFilter.Apply(
-            Session.Decks,
-            new DeckFilterCriteria { IncludeUnplayable = BuildCriteria().IncludeUnplayable },
-            Session.Collection.Wildcards).ToList();
+    private List<DeckAnalysisResult> Available
+    {
+        get
+        {
+            var tab = BuildCriteria();
+            return DeckFilter.Apply(
+                Session.Decks,
+                new DeckFilterCriteria { Source = tab.Source, IncludeUnplayable = tab.IncludeUnplayable },
+                Session.Collection.Wildcards).ToList();
+        }
+    }
+
+    private int UserDeckCount => Session.Decks.Count(d => d.Deck.IsUserDeck);
 
     private List<DeckAnalysisResult> Filtered
     {

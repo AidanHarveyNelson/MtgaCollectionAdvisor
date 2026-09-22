@@ -20,4 +20,14 @@ public sealed record CandidateDeck(
     string FormatKey,
     int Popularity,
     IReadOnlyList<DeckCardRef> Cards,
-    DateTimeOffset FetchedAt);
+    DateTimeOffset FetchedAt)
+{
+    /// <summary>Source-id prefix for decks the user pasted in by hand.</summary>
+    public const string ManualSourcePrefix = "manual:";
+
+    /// <summary>
+    /// A deck the user added rather than one fetched from a public source. These are
+    /// never filtered out of the UI: the user asked for them by name.
+    /// </summary>
+    public bool IsUserDeck => SourceId.StartsWith(ManualSourcePrefix, StringComparison.Ordinal);
+}
