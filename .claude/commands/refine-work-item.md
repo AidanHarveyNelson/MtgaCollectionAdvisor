@@ -1,3 +1,8 @@
+---
+description: Turn a GitHub issue into an implementation guide comment that /implement-work-item can follow without guessing
+argument-hint: <issue-number>
+---
+
 # Refine Work Item
 
 Turn a GitHub issue into an implementation guide, posted as a comment on that issue, that

@@ -1,3 +1,8 @@
+---
+description: Push the feature branch and open a pull request against master with enough context to review
+argument-hint: <issue-number>
+---
+
 # Complete Work Item
 
 Push a finished feature branch, open a pull request against `master`, and give the reviewer

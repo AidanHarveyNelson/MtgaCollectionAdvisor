@@ -1,3 +1,8 @@
+---
+description: Execute the implementation guide on a GitHub issue - code, tests, smoke tests - then post a QA report
+argument-hint: <issue-number>
+---
+
 # Implement Work Item
 
 Execute the plan already captured in the `<!-- IMPLEMENTATION-GUIDE -->` comment on a GitHub
