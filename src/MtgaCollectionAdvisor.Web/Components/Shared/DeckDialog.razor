@@ -28,8 +28,33 @@
         <div class="field">
             <label for="deck-list">Decklist</label>
             <textarea id="deck-list" class="export-area" placeholder="Deck&#10;4 Card Name&#10;..."
-                      @oninput="e => _decklist = e.Value?.ToString() ?? string.Empty">@_decklist</textarea>
+                      @oninput="OnDecklistChangedAsync">@_decklist</textarea>
         </div>
+
+        @if (_preview is not null)
+        {
+            @* What this list would cost, before committing to it. A bare total decides
+               nothing - five commons is pocket change, five mythics is weeks of play. *@
+            <div class="wc-preview">
+                <div class="wc-preview-head">
+                    <span class="picker-label">Wildcards needed</span>
+                    <span class="result-count">
+                        @_preview.OwnedFraction.ToString("P0") of the list already yours
+                    </span>
+                </div>
+
+                <WildcardCost Needed="_preview.Needed" Large="true" />
+
+                @if (_preview.UnavailableOnArena.Count > 0)
+                {
+                    <div class="deck-warning">Not on Arena: @string.Join(", ", _preview.UnavailableOnArena)</div>
+                }
+                @if (_preview.IllegalInFormat.Count > 0)
+                {
+                    <div class="deck-warning">Not legal in @_format.DisplayName: @string.Join(", ", _preview.IllegalInFormat)</div>
+                }
+            </div>
+        }
 
         @if (_error is not null)
         {
@@ -55,6 +80,8 @@
     private string _decklist = string.Empty;
     private FormatDefinition _format = Formats.Standard;
     private string? _error;
+    private DeckAnalysisResult? _preview;
+    private int _previewToken;
 
     protected override void OnInitialized()
     {
@@ -69,10 +96,42 @@
         _decklist = Session.ExportDeck(Deck);
     }
 
-    private void OnFormatChanged(ChangeEventArgs e)
+    // The edit dialog opens with a list already in it, so it should open with its cost too.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _decklist.Length > 0) await RefreshPreviewAsync();
+    }
+
+    private async Task OnFormatChanged(ChangeEventArgs e)
     {
         var key = e.Value?.ToString();
         _format = Formats.All.FirstOrDefault(f => f.Key == key) ?? Formats.Standard;
+
+        // Legality is per format, so the same list can cost differently under each.
+        await RefreshPreviewAsync();
+    }
+
+    private async Task OnDecklistChangedAsync(ChangeEventArgs e)
+    {
+        _decklist = e.Value?.ToString() ?? string.Empty;
+        await RefreshPreviewAsync();
+    }
+
+    /// <summary>
+    /// Debounced: pasting 60 lines fires an event per keystroke, and each preview is a
+    /// query per distinct card name. The token makes every earlier pass discard itself.
+    /// </summary>
+    private async Task RefreshPreviewAsync()
+    {
+        var token = ++_previewToken;
+        await Task.Delay(300);
+        if (token != _previewToken) return;
+
+        var result = await Session.PreviewDeckAsync(_format, _decklist);
+        if (token != _previewToken) return;
+
+        _preview = result;
+        StateHasChanged();
     }
 
     private async Task SaveAsync()

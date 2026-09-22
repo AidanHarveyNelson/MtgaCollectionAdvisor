@@ -187,7 +187,6 @@
                             <th class="sortable @SortClass(SortKey.Name)" @onclick="() => Sort(SortKey.Name)">Deck</th>
                             <th>Colours</th>
                             <th class="sortable num @SortClass(SortKey.Wildcards)" @onclick="() => Sort(SortKey.Wildcards)">Wildcards</th>
-                            <th class="col-breakdown">Breakdown</th>
                             <th class="sortable col-owned @SortClass(SortKey.Owned)" @onclick="() => Sort(SortKey.Owned)">Owned</th>
                             <th>Craftable</th>
                         </tr>
@@ -237,15 +236,7 @@
                                 </td>
                                 <td><ManaColors Colors="@deck.Colors" /></td>
                                 <td class="num">
-                                    <span class="wc-total @(deck.Needed.Total == 0 ? "zero" : "")">@deck.Needed.Total</span>
-                                </td>
-                                <td class="col-breakdown">
-                                    <div class="wc-breakdown">
-                                        <span class="@(deck.Needed.Commons > 0 ? "c" : "off")">@deck.Needed.Commons C</span>
-                                        <span class="@(deck.Needed.Uncommons > 0 ? "u" : "off")">@deck.Needed.Uncommons U</span>
-                                        <span class="@(deck.Needed.Rares > 0 ? "r" : "off")">@deck.Needed.Rares R</span>
-                                        <span class="@(deck.Needed.Mythics > 0 ? "m" : "off")">@deck.Needed.Mythics M</span>
-                                    </div>
+                                    <WildcardCost Needed="deck.Needed" />
                                 </td>
                                 <td class="col-owned">
                                     <div class="owned-cell">
@@ -270,7 +261,7 @@
                                 @* A sibling row, deliberately without the row click handler:
                                    clicking inside the drawer must not close it. *@
                                 <tr class="detail-row">
-                                    <td colspan="7">
+                                    <td colspan="6">
                                         <DeckDetail Deck="deck"
                                                     Copied="_copied"
                                                     OnCopy="CopyDeckAsync"

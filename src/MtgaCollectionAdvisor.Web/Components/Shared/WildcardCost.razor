@@ -1,0 +1,26 @@
+@using MtgaCollectionAdvisor.Core.Models
+
+@* A wildcard cost as one unit: the total, and what it is made of.
+
+   The total on its own decides almost nothing - five commons is pocket change and five
+   mythics is weeks of play - so the per-rarity split sits beside it rather than in a
+   column of its own, in the same colours and diamond markers as the wildcard totals in
+   the topbar. Zeroes stay visible but dimmed: "no mythics needed" is information. *@
+
+<span class="wc-cost @(Large ? "large" : "")">
+    <span class="wc-total @(Needed.Total == 0 ? "zero" : "")">@Needed.Total</span>
+
+    <span class="wc-parts">
+        <span class="wc-part common @(Needed.Commons > 0 ? "" : "off")" title="@Needed.Commons common">@Needed.Commons</span>
+        <span class="wc-part uncommon @(Needed.Uncommons > 0 ? "" : "off")" title="@Needed.Uncommons uncommon">@Needed.Uncommons</span>
+        <span class="wc-part rare @(Needed.Rares > 0 ? "" : "off")" title="@Needed.Rares rare">@Needed.Rares</span>
+        <span class="wc-part mythic @(Needed.Mythics > 0 ? "" : "off")" title="@Needed.Mythics mythic">@Needed.Mythics</span>
+    </span>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public WildcardNeed Needed { get; set; } = WildcardNeed.Zero;
+
+    /// <summary>Larger rendering for the dialog preview, where the cost is the headline.</summary>
+    [Parameter] public bool Large { get; set; }
+}
