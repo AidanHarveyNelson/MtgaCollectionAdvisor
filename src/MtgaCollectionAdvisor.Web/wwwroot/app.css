@@ -417,15 +417,16 @@ input[type="text"], input[type="number"], select {
 .pin {
     border: none;
     background: transparent;
-    color: var(--border-strong);
-    font-size: 16px;
-    line-height: 1;
-    padding: 2px 4px;
+    color: var(--text-faint);
+    line-height: 0;
+    padding: 4px;
     border-radius: 4px;
+    transition: color 120ms ease, transform 120ms ease;
 }
 
 .pin:hover { background: transparent; color: var(--accent); transform: scale(1.15); }
 .pin.on { color: var(--accent); }
+.pin.on svg { filter: drop-shadow(0 0 4px rgba(232, 163, 61, 0.45)); }
 
 .progress {
     margin-left: var(--space-2);
