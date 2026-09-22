@@ -21,6 +21,7 @@ public sealed class AdvisorServices : IAsyncDisposable
     public CollectionExporterJsonImporter CollectionExporterJsonImporter { get; }
     public MemoryCollectionSyncService MemoryCollectionSyncService { get; }
     public CuratedDeckStore CuratedDeckStore { get; }
+    public PinnedDeckStore PinnedDeckStore { get; }
     public CollectionBrowserQuery CollectionBrowserQuery { get; }
     public DeckRankingService DeckRankingService { get; }
     public PlayerLogWatcher PlayerLogWatcher { get; }
@@ -38,6 +39,7 @@ public sealed class AdvisorServices : IAsyncDisposable
         CollectionExporterJsonImporter = new CollectionExporterJsonImporter(CollectionStore);
         MemoryCollectionSyncService = new MemoryCollectionSyncService(CardDatabaseStore, CollectionStore);
         CuratedDeckStore = new CuratedDeckStore(Database);
+        PinnedDeckStore = new PinnedDeckStore(Database);
         CollectionBrowserQuery = new CollectionBrowserQuery(Database);
         DeckRankingService = new DeckRankingService(new WildcardCalculator(CardDatabaseStore));
         PlayerLogWatcher = new PlayerLogWatcher(config.PlayerLogPathOverride);

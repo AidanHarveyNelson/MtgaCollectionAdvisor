@@ -92,7 +92,9 @@ input[type="text"], input[type="number"], select {
 
 /* ---------- App shell ---------- */
 
-.app { display: flex; flex-direction: column; min-height: 100vh; }
+/* A desktop tool has a width below which reflowing helps nobody; past this floor
+   the window scrolls sideways instead of rearranging itself. */
+.app { display: flex; flex-direction: column; min-height: 100vh; min-width: 760px; }
 
 .topbar {
     display: flex;
@@ -169,21 +171,72 @@ input[type="text"], input[type="number"], select {
 
 .workspace {
     display: grid;
-    grid-template-columns: 260px minmax(0, 1fr);
+    grid-template-columns: clamp(200px, 20vw, 260px) minmax(0, 1fr);
     gap: var(--space-5);
     padding: var(--space-5);
     align-items: start;
     flex: 1;
 }
 
-@media (max-width: 1100px) {
-    .workspace { grid-template-columns: 1fr; }
-    .filters { position: static; }
-}
-
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 
 .filters { padding: var(--space-4); position: sticky; top: 92px; }
+
+/* Both only appear in the narrow layout below. */
+.filters-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 8, 12, 0.6);
+    z-index: 50;
+}
+
+.filters-toggle {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+}
+
+/* Below this the sidebar and the deck table stop fitting side by side - the table alone
+   needs about 650px. Stacking them would bury the decks under a tall filter column, so
+   the filters move into a drawer and the list keeps the full width instead.
+   These blocks must stay after the rules they override: same specificity, source order
+   decides, so a `.filters` rule further down the file would win over the media query. */
+@media (max-width: 1000px) {
+    .workspace { grid-template-columns: minmax(0, 1fr); }
+
+    .filters-toggle { display: inline-flex; }
+    .workspace.filters-open .filters-backdrop { display: block; }
+
+    .filters {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 60;
+        width: 280px;
+        max-width: 85vw;
+        overflow-y: auto;
+        border-radius: 0;
+        border-top: none;
+        border-bottom: none;
+        border-left: none;
+        box-shadow: 0 0 32px rgba(0, 0, 0, 0.6);
+        visibility: hidden;
+        transform: translateX(-100%);
+        transition: transform 160ms ease, visibility 160ms ease;
+    }
+
+    .workspace.filters-open .filters { visibility: visible; transform: none; }
+}
+
+/* Narrower still: the wildcard total and craftability carry the decision, so the
+   per-rarity breakdown and the owned bar give up their columns. */
+@media (max-width: 880px) {
+    .deck-table .col-breakdown, .deck-table .col-owned { display: none; }
+}
 .filter-group { margin-bottom: var(--space-5); }
 .filter-group:last-child { margin-bottom: 0; }
 
@@ -249,6 +302,8 @@ input[type="text"], input[type="number"], select {
     gap: var(--space-3);
     flex-wrap: wrap;
 }
+
+.list-title { display: flex; align-items: center; gap: var(--space-3); }
 
 .result-count { color: var(--text-muted); font-size: 13px; }
 
@@ -447,6 +502,41 @@ input[type="text"], input[type="number"], select {
     padding: var(--space-3);
     resize: vertical;
 }
+
+/* ---------- Pinning ---------- */
+
+.deck-table .pin-col {
+    width: 44px;
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+    text-align: center;
+}
+
+.pin {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: transparent;
+    color: var(--text-faint);
+    padding: 0;
+    border-radius: var(--radius-sm);
+    transition: color 120ms ease, transform 120ms ease;
+}
+
+.pin:hover { background: transparent; color: var(--accent); transform: scale(1.15); }
+.pin.on { color: var(--accent); }
+.pin.on svg { filter: drop-shadow(0 0 4px rgba(232, 163, 61, 0.45)); }
+
+.progress {
+    margin-left: var(--space-2);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.progress.down { color: var(--positive); }
+.progress.up { color: var(--negative); }
 
 /* ---------- Card picker ---------- */
 
