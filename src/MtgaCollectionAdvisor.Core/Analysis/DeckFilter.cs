@@ -2,6 +2,18 @@ using MtgaCollectionAdvisor.Core.Models;
 
 namespace MtgaCollectionAdvisor.Core.Analysis;
 
+/// <summary>Which half of the pool a list is showing.</summary>
+public enum DeckSourceFilter
+{
+    Any,
+
+    /// <summary>Decks pulled from a public source.</summary>
+    Fetched,
+
+    /// <summary>Decks the user added by hand.</summary>
+    User
+}
+
 /// <summary>
 /// Everything the deck list can be narrowed by. Lives here rather than in the UI so the
 /// rules can be tested without rendering a component or touching a database.
@@ -33,6 +45,12 @@ public sealed record DeckFilterCriteria
     /// </summary>
     public bool IncludeUnplayable { get; init; }
 
+    /// <summary>
+    /// Show only fetched decks, only the user's own, or both. Absent from
+    /// <see cref="IsEmpty"/> for the same reason as <see cref="IncludeUnplayable"/>.
+    /// </summary>
+    public DeckSourceFilter Source { get; init; } = DeckSourceFilter.Any;
+
     public bool IsEmpty =>
         Colors.Count == 0
         && !OnlyCraftable
@@ -50,6 +68,13 @@ public static class DeckFilter
         WildcardInventory wallet)
     {
         IEnumerable<DeckAnalysisResult> query = decks;
+
+        query = criteria.Source switch
+        {
+            DeckSourceFilter.User => query.Where(d => d.Deck.IsUserDeck),
+            DeckSourceFilter.Fetched => query.Where(d => !d.Deck.IsUserDeck),
+            _ => query
+        };
 
         // Deck sources let anyone file any list under any format, and a list can name a
         // card that never came to Arena. Dropping those is right for suggestions and
