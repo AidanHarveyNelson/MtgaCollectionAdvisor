@@ -373,7 +373,15 @@ input[type="text"], input[type="number"], select {
 .deck-name { font-weight: 600; }
 .deck-meta { color: var(--text-faint); font-size: 12px; }
 
-.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* The wildcard total is a single badge, not a column of digits. The header inherited
+   .deck-table th's left alignment while the cell was right-aligned, so the badge drifted
+   to the far side of a wide column and sat against Breakdown - which read as though the
+   number belonged to that column. Header and cell are centred together instead. */
+.deck-table th.num,
+.deck-table td.num {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
 
 .wc-total {
     display: inline-flex;
