@@ -1,0 +1,89 @@
+@using MtgaCollectionAdvisor.Core.Models
+@inject AdvisorSession Session
+
+@* The deck's card list, wildcard gap and actions. Rendered as a drawer beneath the row
+   it belongs to, so the deck stays where the user clicked it. *@
+
+<div class="deck-detail">
+    <div class="detail-header">
+        <h2>@Deck.Deck.Name</h2>
+        <ManaColors Colors="@Deck.Colors" />
+        <span class="result-count">
+            @Deck.Needed.Total wildcards needed · @Deck.OwnedFraction.ToString("P0") of the list already yours
+        </span>
+        <div class="detail-actions">
+            @if (!string.IsNullOrWhiteSpace(Deck.Deck.Url))
+            {
+                <a href="@Deck.Deck.Url" target="_blank" rel="noopener">
+                    <button>Open source</button>
+                </a>
+            }
+            <button class="primary" @onclick="OnCopy">@(Copied ? "Copied!" : "Copy for Arena")</button>
+            @if (Deck.Deck.IsUserDeck)
+            {
+                @* Fetched decks are replaced wholesale on every refresh, so editing one
+                   would be discarded without a word. *@
+                <button @onclick="OnEdit">Edit</button>
+            }
+            <button @onclick="OnRemove">Remove</button>
+        </div>
+    </div>
+
+    <div class="card-columns">
+        <div>
+            <div class="card-list-title">Mainboard</div>
+            @foreach (var gap in Deck.Gaps.Where(g => g.Board == DeckBoard.Main).OrderBy(g => g.CardName))
+            {
+                @RenderCardRow(gap)
+            }
+        </div>
+
+        @if (Deck.Gaps.Any(g => g.Board == DeckBoard.Sideboard))
+        {
+            <div>
+                <div class="card-list-title">Sideboard</div>
+                @foreach (var gap in Deck.Gaps.Where(g => g.Board == DeckBoard.Sideboard).OrderBy(g => g.CardName))
+                {
+                    @RenderCardRow(gap)
+                }
+            </div>
+        }
+
+        <div>
+            <div class="card-list-title">Export (Arena format)</div>
+            <textarea class="export-area" readonly>@Session.ExportDeck(Deck.Deck)</textarea>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public DeckAnalysisResult Deck { get; set; } = null!;
+
+    /// <summary>True right after Copy for Arena, so the button can confirm.</summary>
+    [Parameter] public bool Copied { get; set; }
+
+    [Parameter] public EventCallback OnCopy { get; set; }
+    [Parameter] public EventCallback OnEdit { get; set; }
+    [Parameter] public EventCallback OnRemove { get; set; }
+
+    private RenderFragment RenderCardRow(CardGap gap) => @<div class="card-row @CardRowClass(gap)">
+        <span class="card-qty">@gap.Owned / @gap.Needed</span>
+        <span class="card-name">@gap.CardName</span>
+        @if (gap.Missing > 0)
+        {
+            <span class="card-need @RarityClass(gap.Rarity)">need @gap.Missing</span>
+        }
+    </div>;
+
+    private static string CardRowClass(CardGap gap) =>
+        gap.Missing == 0 ? "owned" : gap.Owned > 0 ? "partial" : "missing";
+
+    private static string RarityClass(CardRarity rarity) => rarity switch
+    {
+        CardRarity.Common => "c",
+        CardRarity.Uncommon => "u",
+        CardRarity.Rare => "r",
+        CardRarity.Mythic => "m",
+        _ => ""
+    };
+}

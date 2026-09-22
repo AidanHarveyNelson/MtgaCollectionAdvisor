@@ -195,7 +195,7 @@
                     <tbody>
                         @foreach (var deck in PageItems)
                         {
-                            <tr class="@(ReferenceEquals(deck, _selected) ? "selected" : "")" @onclick="() => Select(deck)">
+                            <tr class="@(ReferenceEquals(deck, _selected) ? "selected open" : "")" @onclick="() => Select(deck)">
                                 <td class="pin-col" @onclick:stopPropagation>
                                     <button class="pin @(Session.IsPinned(deck.Deck.SourceId) ? "on" : "")"
                                             title="@(Session.IsPinned(deck.Deck.SourceId) ? "Unpin" : "Pin to track progress")"
@@ -264,6 +264,21 @@
                                     }
                                 </td>
                             </tr>
+
+                            @if (ReferenceEquals(deck, _selected))
+                            {
+                                @* A sibling row, deliberately without the row click handler:
+                                   clicking inside the drawer must not close it. *@
+                                <tr class="detail-row">
+                                    <td colspan="7">
+                                        <DeckDetail Deck="deck"
+                                                    Copied="_copied"
+                                                    OnCopy="CopyDeckAsync"
+                                                    OnEdit="() => _editing = deck"
+                                                    OnRemove="() => Session.DeleteDeckAsync(deck.Deck.SourceId)" />
+                                    </td>
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>
@@ -278,68 +293,14 @@
                         </select>
                     </div>
                     <div class="page-controls">
-                        <button disabled="@(_page <= 1)" @onclick="() => _page--">‹ Previous</button>
+                        <button disabled="@(_page <= 1)" @onclick="() => GoToPage(_page - 1)">‹ Previous</button>
                         <span class="page-info">Page @_page of @TotalPages</span>
-                        <button disabled="@(_page >= TotalPages)" @onclick="() => _page++">Next ›</button>
+                        <button disabled="@(_page >= TotalPages)" @onclick="() => GoToPage(_page + 1)">Next ›</button>
                     </div>
                 </div>
             }
         </div>
 
-        @if (_selected is not null)
-        {
-            <div class="panel detail">
-                <div class="detail-header">
-                    <h2>@_selected.Deck.Name</h2>
-                    <ManaColors Colors="@_selected.Colors" />
-                    <span class="result-count">
-                        @_selected.Needed.Total wildcards needed · @_selected.OwnedFraction.ToString("P0") of the list already yours
-                    </span>
-                    <div class="detail-actions">
-                        @if (!string.IsNullOrWhiteSpace(_selected.Deck.Url))
-                        {
-                            <a href="@_selected.Deck.Url" target="_blank" rel="noopener">
-                                <button>Open source</button>
-                            </a>
-                        }
-                        <button class="primary" @onclick="CopyDeckAsync">@(_copied ? "Copied!" : "Copy for Arena")</button>
-                        @if (_selected.Deck.IsUserDeck)
-                        {
-                            @* Fetched decks are replaced wholesale on every refresh, so editing one
-                               would be discarded without a word. *@
-                            <button @onclick="() => _editing = _selected">Edit</button>
-                        }
-                        <button @onclick="() => Session.DeleteDeckAsync(_selected!.Deck.SourceId)">Remove</button>
-                    </div>
-                </div>
-
-                <div class="card-columns">
-                    <div>
-                        <div class="card-list-title">Mainboard</div>
-                        @foreach (var gap in _selected.Gaps.Where(g => g.Board == DeckBoard.Main).OrderBy(g => g.CardName))
-                        {
-                            @RenderCardRow(gap)
-                        }
-                    </div>
-
-                    @if (_selected.Gaps.Any(g => g.Board == DeckBoard.Sideboard))
-                    {
-                        <div>
-                            <div class="card-list-title">Sideboard</div>
-                            @foreach (var gap in _selected.Gaps.Where(g => g.Board == DeckBoard.Sideboard).OrderBy(g => g.CardName))
-                            {
-                                @RenderCardRow(gap)
-                            }
-                        </div>
-                    }
-
-                    <div>
-                        <div class="card-list-title">Export (Arena format)</div>
-                        <textarea class="export-area" readonly>@Session.ExportDeck(_selected.Deck)</textarea>
-                    </div>
-                </div>
-            </div>
-        }
     </section>
 </div>
 
@@ -400,6 +361,16 @@
         _page = 1;
         StateHasChanged();
     });
+
+    /// <summary>
+    /// The detail is a drawer under its own row now, so a selection whose row is not on
+    /// the page would be an open drawer nobody can see.
+    /// </summary>
+    private void GoToPage(int page)
+    {
+        _page = page;
+        _selected = null;
+    }
 
     private void ShowTab(DeckTab tab)
     {
@@ -466,6 +437,7 @@
     {
         _pageSize = int.TryParse(e.Value?.ToString(), out var size) ? size : 25;
         _page = 1;
+        _selected = null;
     }
 
     private void Select(DeckAnalysisResult deck)
@@ -568,26 +540,6 @@
         }
     }
 
-    private RenderFragment RenderCardRow(CardGap gap) => @<div class="card-row @CardRowClass(gap)">
-        <span class="card-qty">@gap.Owned / @gap.Needed</span>
-        <span class="card-name">@gap.CardName</span>
-        @if (gap.Missing > 0)
-        {
-            <span class="card-need @RarityClass(gap.Rarity)">need @gap.Missing</span>
-        }
-    </div>;
-
-    private static string CardRowClass(CardGap gap) =>
-        gap.Missing == 0 ? "owned" : gap.Owned > 0 ? "partial" : "missing";
-
-    private static string RarityClass(CardRarity rarity) => rarity switch
-    {
-        CardRarity.Common => "c",
-        CardRarity.Uncommon => "u",
-        CardRarity.Rare => "r",
-        CardRarity.Mythic => "m",
-        _ => ""
-    };
 
     public void Dispose() => Session.Changed -= OnSessionChanged;
 }
