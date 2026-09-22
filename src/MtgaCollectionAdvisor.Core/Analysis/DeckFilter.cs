@@ -23,6 +23,11 @@ public sealed record DeckFilterCriteria
     /// <summary>None of these cards may be in the deck.</summary>
     public IReadOnlyList<string> ExcludesCards { get; init; } = [];
 
+    /// <summary>Show only decks the user is tracking.</summary>
+    public bool OnlyPinned { get; init; }
+
+    public IReadOnlySet<string> PinnedSourceIds { get; init; } = new HashSet<string>();
+
     /// <summary>
     /// Keep decks that are illegal in the format or use cards missing from Arena. The
     /// recommended list leaves this off; a list of the user's own decks turns it on,
@@ -39,7 +44,8 @@ public sealed record DeckFilterCriteria
         && MaxWildcards is null
         && string.IsNullOrWhiteSpace(NameSearch)
         && ContainsCards.Count == 0
-        && ExcludesCards.Count == 0;
+        && ExcludesCards.Count == 0
+        && !OnlyPinned;
 }
 
 public static class DeckFilter
@@ -90,6 +96,11 @@ public static class DeckFilter
         if (criteria.ExcludesCards.Count > 0)
         {
             query = query.Where(d => !criteria.ExcludesCards.Any(card => PlaysCard(d, card)));
+        }
+
+        if (criteria.OnlyPinned)
+        {
+            query = query.Where(d => criteria.PinnedSourceIds.Contains(d.Deck.SourceId));
         }
 
         return query.ToList();

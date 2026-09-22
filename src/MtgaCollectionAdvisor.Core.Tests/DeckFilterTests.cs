@@ -189,6 +189,33 @@ public class DeckFilterTests
         Assert.True(new DeckFilterCriteria { IncludeUnplayable = true }.IsEmpty);
     }
 
+    [Fact]
+    public void Apply_Should_KeepOnlyPinnedDecks_When_OnlyPinnedIsSet()
+    {
+        var tracked = Deck("Tracked", "R", ["Mountain"]);
+        var other = Deck("Other", "R", ["Mountain"]);
+        var criteria = new DeckFilterCriteria
+        {
+            OnlyPinned = true,
+            PinnedSourceIds = new HashSet<string> { tracked.Deck.SourceId }
+        };
+
+        var result = DeckFilter.Apply([tracked, other], criteria, EmptyWallet);
+
+        Assert.Single(result);
+        Assert.Equal("Tracked", result[0].Deck.Name);
+    }
+
+    [Fact]
+    public void Apply_Should_ReturnEmpty_When_OnlyPinnedIsSetAndNothingIsPinned()
+    {
+        var deck = Deck("Anything", "R", ["Mountain"]);
+
+        var result = DeckFilter.Apply([deck], new DeckFilterCriteria { OnlyPinned = true }, EmptyWallet);
+
+        Assert.Empty(result);
+    }
+
     private static DeckAnalysisResult Deck(
         string name,
         string colors,
