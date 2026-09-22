@@ -24,7 +24,13 @@ public sealed class CuratedDeckStore(Database database)
 
         await using (var clear = connection.CreateCommand())
         {
-            clear.CommandText = "DELETE FROM decks WHERE format_key = $format AND source_id LIKE $prefix";
+            // Pinned decks are spared: the user is tracking them, and a deck dropped by the
+            // source would otherwise vanish mid-progress.
+            clear.CommandText = """
+                DELETE FROM decks
+                WHERE format_key = $format AND source_id LIKE $prefix
+                  AND source_id NOT IN (SELECT source_id FROM pinned_decks)
+                """;
             clear.Parameters.AddWithValue("$format", format.Key);
             clear.Parameters.AddWithValue("$prefix", sourcePrefix + "%");
             await clear.ExecuteNonQueryAsync(ct);
@@ -32,6 +38,15 @@ public sealed class CuratedDeckStore(Database database)
 
         foreach (var deck in decks)
         {
+            // A spared pinned deck is still in this batch, so replace it rather than
+            // colliding on the primary key - its contents should track the source.
+            await using (var replace = connection.CreateCommand())
+            {
+                replace.CommandText = "DELETE FROM decks WHERE source_id = $id";
+                replace.Parameters.AddWithValue("$id", deck.SourceId);
+                await replace.ExecuteNonQueryAsync(ct);
+            }
+
             await InsertDeckAsync(connection, deck, ct);
         }
 
