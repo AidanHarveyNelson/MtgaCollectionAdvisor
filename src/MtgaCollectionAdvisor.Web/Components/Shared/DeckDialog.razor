@@ -3,7 +3,7 @@
 
 <div class="modal-backdrop" @onclick="OnCancel">
     <div class="modal-panel" @onclick:stopPropagation>
-        <h2>Import deck</h2>
+        <h2>@(IsEdit ? "Edit deck" : "Import deck")</h2>
         <p class="hint">
             Paste a list in Arena's export format (e.g. <code>4 Lightning Bolt (STA) 42</code>),
             with an optional <code>Sideboard</code> section.
@@ -28,7 +28,7 @@
         <div class="field">
             <label for="deck-list">Decklist</label>
             <textarea id="deck-list" class="export-area" placeholder="Deck&#10;4 Card Name&#10;..."
-                      @oninput="e => _decklist = e.Value?.ToString() ?? string.Empty"></textarea>
+                      @oninput="e => _decklist = e.Value?.ToString() ?? string.Empty">@_decklist</textarea>
         </div>
 
         @if (_error is not null)
@@ -38,7 +38,7 @@
 
         <div class="modal-actions">
             <button @onclick="OnCancel">Cancel</button>
-            <button class="primary" @onclick="ImportAsync">Import</button>
+            <button class="primary" @onclick="SaveAsync">@(IsEdit ? "Save" : "Import")</button>
         </div>
     </div>
 </div>
@@ -46,12 +46,28 @@
 @code {
     [Parameter] public EventCallback OnClose { get; set; }
 
+    /// <summary>The deck being edited; null opens the dialog for a new one.</summary>
+    [Parameter] public CandidateDeck? Deck { get; set; }
+
+    private bool IsEdit => Deck is not null;
+
     private string _name = string.Empty;
     private string _decklist = string.Empty;
     private FormatDefinition _format = Formats.Standard;
     private string? _error;
 
-    protected override void OnInitialized() => _format = Session.Format;
+    protected override void OnInitialized()
+    {
+        if (Deck is null)
+        {
+            _format = Session.Format;
+            return;
+        }
+
+        _name = Deck.Name;
+        _format = Formats.All.FirstOrDefault(f => f.Key == Deck.FormatKey) ?? Session.Format;
+        _decklist = Session.ExportDeck(Deck);
+    }
 
     private void OnFormatChanged(ChangeEventArgs e)
     {
@@ -59,12 +75,20 @@
         _format = Formats.All.FirstOrDefault(f => f.Key == key) ?? Formats.Standard;
     }
 
-    private async Task ImportAsync()
+    private async Task SaveAsync()
     {
         if (string.IsNullOrWhiteSpace(_name)) { _error = "Give the deck a name."; return; }
         if (string.IsNullOrWhiteSpace(_decklist)) { _error = "Paste the decklist."; return; }
 
-        await Session.ImportDeckAsync(_name.Trim(), _format, _decklist);
+        if (Deck is null)
+        {
+            await Session.ImportDeckAsync(_name.Trim(), _format, _decklist);
+        }
+        else
+        {
+            await Session.UpdateDeckAsync(Deck, _name.Trim(), _format, _decklist);
+        }
+
         await OnClose.InvokeAsync();
     }
 

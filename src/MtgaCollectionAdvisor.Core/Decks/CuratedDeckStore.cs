@@ -78,6 +78,11 @@ public sealed class CuratedDeckStore(Database database)
             await insertDeck.ExecuteNonQueryAsync(ct);
         }
 
+        await InsertCardsAsync(connection, deck, ct);
+    }
+
+    private static async Task InsertCardsAsync(SqliteConnection connection, CandidateDeck deck, CancellationToken ct)
+    {
         // Deck sources list cards per printing, so the same card name can appear more
         // than once on a board ("7 Island" as two entries) - collapse those first.
         var merged = deck.Cards
@@ -101,6 +106,53 @@ public sealed class CuratedDeckStore(Database database)
             quantityParameter.Value = card.Quantity;
             await insertCard.ExecuteNonQueryAsync(ct);
         }
+    }
+
+    /// <summary>
+    /// Replaces a user deck's name, format and cards while keeping its source id, so the
+    /// pin on it survives - re-importing mints a new id and takes the pin's baseline with
+    /// it, which is the whole reason this exists.
+    ///
+    /// Refuses anything but a manual deck: an auto-fetched one is overwritten wholesale on
+    /// the next refresh, so the edit would vanish without a word.
+    /// </summary>
+    public async Task UpdateUserDeckAsync(CandidateDeck deck, CancellationToken ct = default)
+    {
+        if (!deck.IsUserDeck)
+        {
+            throw new InvalidOperationException(
+                $"Only user decks can be edited; '{deck.SourceId}' is fetched and would be overwritten on the next refresh.");
+        }
+
+        await using var connection = await database.OpenAsync(ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+
+        await using (var update = connection.CreateCommand())
+        {
+            update.CommandText = """
+                UPDATE decks SET format_key = $format, name = $name WHERE source_id = $id
+                """;
+            update.Parameters.AddWithValue("$id", deck.SourceId);
+            update.Parameters.AddWithValue("$format", deck.FormatKey);
+            update.Parameters.AddWithValue("$name", deck.Name);
+
+            // Nothing updated means the deck is gone - saying nothing here would report
+            // success for a write that never happened.
+            if (await update.ExecuteNonQueryAsync(ct) == 0)
+            {
+                throw new InvalidOperationException($"Deck '{deck.SourceId}' no longer exists.");
+            }
+        }
+
+        await using (var clear = connection.CreateCommand())
+        {
+            clear.CommandText = "DELETE FROM deck_cards WHERE source_id = $id";
+            clear.Parameters.AddWithValue("$id", deck.SourceId);
+            await clear.ExecuteNonQueryAsync(ct);
+        }
+
+        await InsertCardsAsync(connection, deck, ct);
+        await transaction.CommitAsync(ct);
     }
 
     public async Task DeleteDeckAsync(string sourceId, CancellationToken ct = default)
