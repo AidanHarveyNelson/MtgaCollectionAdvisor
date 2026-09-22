@@ -448,7 +448,26 @@ input[type="text"], input[type="number"], select {
 
 /* ---------- Deck detail ---------- */
 
-.detail { margin-top: var(--space-5); }
+/* The detail is a drawer under the row it belongs to, not a panel at the foot of the
+   page: on a full page of 25 decks the old placement meant scrolling past everything to
+   read about a deck clicked at the top, then scrolling back to pick another. */
+.detail-row > td {
+    padding: 0 !important;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+}
+
+/* The open row and its drawer have to read as one block, or the drawer looks like it
+   belongs to whatever row follows. */
+.deck-table tbody tr.open > td { border-bottom-color: transparent; }
+.deck-table tbody tr.open:hover { background: var(--accent-soft); }
+
+.deck-detail {
+    border-left: 3px solid var(--accent);
+    padding-bottom: var(--space-2);
+}
+
+.deck-detail .detail-header { border-bottom: 1px solid var(--border); }
 
 .detail-header {
     display: flex;
