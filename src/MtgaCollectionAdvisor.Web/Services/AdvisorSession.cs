@@ -187,6 +187,51 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
             }
         });
 
+    /// <summary>
+    /// Saves an edit to a deck the user owns, keeping its source id so the pin on it -
+    /// and the deck's creation date - survive. Re-importing would mint a new id and lose
+    /// both.
+    /// </summary>
+    public Task UpdateDeckAsync(CandidateDeck existing, string name, FormatDefinition format, string decklist) =>
+        RunAsync("Saving deck", async report =>
+        {
+            var cards = ArenaDeckListParser.Parse(decklist);
+            if (cards.Count == 0)
+            {
+                // Abort before writing: a typo must not empty a deck the user already has.
+                report("No cards recognised in that text - the deck was left unchanged.");
+                return;
+            }
+
+            var updated = existing with
+            {
+                Name = name,
+                FormatKey = format.Key,
+                Cards = cards
+            };
+
+            await services.CuratedDeckStore.UpdateUserDeckAsync(updated);
+
+            var wasPinned = IsPinned(existing.SourceId);
+            LastImportedSourceId = updated.SourceId;
+            Format = format;
+            await ReloadRankingAsync();
+
+            if (wasPinned)
+            {
+                // The baseline measured progress towards a list that no longer exists.
+                // Rebasing is the honest option, and saying so is the rest of it.
+                var need = Decks.FirstOrDefault(d => d.Deck.SourceId == updated.SourceId)?.Needed.Total ?? 0;
+                await services.PinnedDeckStore.RebaseAsync(updated.SourceId, need);
+                Pins = await services.PinnedDeckStore.LoadAsync();
+                report($"Deck \"{name}\" updated ({cards.Count} lines). Pin progress now measures from this list.");
+            }
+            else
+            {
+                report($"Deck \"{name}\" updated ({cards.Count} lines).");
+            }
+        });
+
     private async Task ReloadRankingAsync()
     {
         Collection = await services.CollectionStore.LoadAsync();

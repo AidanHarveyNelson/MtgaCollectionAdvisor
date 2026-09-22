@@ -303,6 +303,12 @@
                             </a>
                         }
                         <button class="primary" @onclick="CopyDeckAsync">@(_copied ? "Copied!" : "Copy for Arena")</button>
+                        @if (_selected.Deck.IsUserDeck)
+                        {
+                            @* Fetched decks are replaced wholesale on every refresh, so editing one
+                               would be discarded without a word. *@
+                            <button @onclick="() => _editing = _selected">Edit</button>
+                        }
                         <button @onclick="() => Session.DeleteDeckAsync(_selected!.Deck.SourceId)">Remove</button>
                     </div>
                 </div>
@@ -337,6 +343,11 @@
     </section>
 </div>
 
+@if (_editing is not null)
+{
+    <DeckDialog Deck="_editing.Deck" OnClose="() => _editing = null" />
+}
+
 @code {
     private enum SortKey { Wildcards, Owned, Name }
 
@@ -359,6 +370,9 @@
     private DeckAnalysisResult? _selected;
     private bool _copied;
     private DeckTab _tab = DeckTab.Suggestions;
+
+    /// <summary>The deck whose edit dialog is open, if any.</summary>
+    private DeckAnalysisResult? _editing;
 
     /// <summary>Only meaningful in the narrow layout, where the filters live in a drawer.</summary>
     private bool _showFilters;

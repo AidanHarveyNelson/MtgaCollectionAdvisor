@@ -36,6 +36,30 @@ public sealed class PinnedDeckStore(Database database)
         await command.ExecuteNonQueryAsync(ct);
     }
 
+    /// <summary>
+    /// Moves a pin's baseline to a new wildcard count, for when the deck itself changed.
+    /// Deliberately separate from <see cref="PinAsync"/>, which refuses to overwrite a
+    /// baseline because that is how progress is preserved - here the list the baseline
+    /// referred to no longer exists, so keeping it would report progress never made.
+    ///
+    /// Does nothing if the deck is not pinned: rebasing must never create a pin.
+    /// </summary>
+    public async Task RebaseAsync(string sourceId, int wildcardsNow, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(sourceId)) return;
+
+        await using var connection = await database.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE pinned_decks SET wildcards_when_pinned = $wildcards, pinned_at = $at
+            WHERE source_id = $id
+            """;
+        command.Parameters.AddWithValue("$id", sourceId);
+        command.Parameters.AddWithValue("$at", DateTimeOffset.UtcNow.ToString("O"));
+        command.Parameters.AddWithValue("$wildcards", Math.Max(0, wildcardsNow));
+        await command.ExecuteNonQueryAsync(ct);
+    }
+
     public async Task UnpinAsync(string sourceId, CancellationToken ct = default)
     {
         await using var connection = await database.OpenAsync(ct);
