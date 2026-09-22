@@ -23,6 +23,16 @@ public sealed record DeckFilterCriteria
     /// <summary>None of these cards may be in the deck.</summary>
     public IReadOnlyList<string> ExcludesCards { get; init; } = [];
 
+    /// <summary>
+    /// Keep decks that are illegal in the format or use cards missing from Arena. The
+    /// recommended list leaves this off; a list of the user's own decks turns it on,
+    /// because a deck someone imported by hand should never silently disappear.
+    ///
+    /// Deliberately absent from <see cref="IsEmpty"/>: this is which list is being shown,
+    /// not a filter the user chose, so it must not offer them a "clear filters" link.
+    /// </summary>
+    public bool IncludeUnplayable { get; init; }
+
     public bool IsEmpty =>
         Colors.Count == 0
         && !OnlyCraftable
@@ -40,6 +50,14 @@ public static class DeckFilter
         WildcardInventory wallet)
     {
         IEnumerable<DeckAnalysisResult> query = decks;
+
+        // Deck sources let anyone file any list under any format, and a list can name a
+        // card that never came to Arena. Dropping those is right for suggestions and
+        // wrong for a deck the user asked for, so it is a switch rather than a rule.
+        if (!criteria.IncludeUnplayable)
+        {
+            query = query.Where(d => d.LegalInFormat && d.FullyPlayableOnArena);
+        }
 
         if (criteria.Colors.Count > 0)
         {

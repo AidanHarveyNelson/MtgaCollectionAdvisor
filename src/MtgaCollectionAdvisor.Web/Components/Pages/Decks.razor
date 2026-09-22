@@ -98,7 +98,7 @@
             <div class="list-header">
                 <h2>Recommended decks</h2>
                 <span class="result-count">
-                    @Filtered.Count of @Session.Decks.Count decks
+                    @Filtered.Count of @Available.Count decks
                     @if (HasActiveFilters)
                     {
                         <text>— </text><a href="#" @onclick:preventDefault @onclick="ClearFilters">clear filters</a>
@@ -111,6 +111,19 @@
                 <div class="empty">
                     <h3>No decks loaded</h3>
                     <p>Click <strong>Fetch decks</strong> to pull public @Session.Format.DisplayName lists.</p>
+                </div>
+            }
+            else if (Available.Count == 0)
+            {
+                @* Decks are stored, but none survive the legality and Arena checks, so
+                   telling the user to loosen their filters would send them nowhere. *@
+                <div class="empty">
+                    <h3>None of the fetched decks are playable</h3>
+                    <p>
+                        Every @Session.Format.DisplayName list pulled so far is either illegal in the
+                        format or uses cards missing from Arena. Try <strong>Fetch decks</strong> again,
+                        or <strong>Update cards</strong> if the card database is out of date.
+                    </p>
                 </div>
             }
             else if (Filtered.Count == 0)
@@ -360,8 +373,24 @@
         MaxWildcards = _maxWildcards,
         NameSearch = _search,
         ContainsCards = _containsCards,
-        ExcludesCards = _excludesCards
+        ExcludesCards = _excludesCards,
+
+        // Suggestions only: a list someone else filed under this format is worth nothing
+        // if it is not actually legal or not all on Arena. The user's own decks get their
+        // own list (#11), which turns this on.
+        IncludeUnplayable = false
     };
+
+    /// <summary>
+    /// What this list could show if the user cleared every filter. Not the whole ranking:
+    /// Session.Decks now carries decks that are illegal or not all on Arena, and counting
+    /// those would read as "your filters are hiding 41 decks" when they are not.
+    /// </summary>
+    private List<DeckAnalysisResult> Available =>
+        DeckFilter.Apply(
+            Session.Decks,
+            new DeckFilterCriteria { IncludeUnplayable = BuildCriteria().IncludeUnplayable },
+            Session.Collection.Wildcards).ToList();
 
     private List<DeckAnalysisResult> Filtered
     {

@@ -149,8 +149,11 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
             return;
         }
 
-        var ranked = await services.DeckRankingService.RankAsync(Format, stored, Collection);
-        Decks = ranked.Where(r => r.LegalInFormat && r.FullyPlayableOnArena).ToList();
+        // Every ranked deck, nothing dropped. Deciding which of them a given list shows is
+        // DeckFilter's job now (DeckFilterCriteria.IncludeUnplayable): filtering here cost
+        // an imported deck its only route into the UI, after import had already reported
+        // success, and nothing told the user why.
+        Decks = await services.DeckRankingService.RankAsync(Format, stored, Collection);
         Notify();
     }
 
