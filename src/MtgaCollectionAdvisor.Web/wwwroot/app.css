@@ -126,21 +126,24 @@ input[type="text"], input[type="number"], select {
 .stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .wildcard-row { display: flex; gap: var(--space-3); font-variant-numeric: tabular-nums; }
-.wildcard { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+.wildcard, .wc-part { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
 
-.wildcard::before {
+/* The same diamond marks a wildcard total in the topbar and a wildcard count in a deck
+   row, so the four numbers in a row read as the same currency as the four in the header. */
+.wildcard::before, .wc-part::before {
     content: "";
-    width: 9px;
-    height: 9px;
     border-radius: 2px;
     transform: rotate(45deg);
     background: currentColor;
 }
 
-.wildcard.common { color: var(--rarity-common); }
-.wildcard.uncommon { color: var(--rarity-uncommon); }
-.wildcard.rare { color: var(--rarity-rare); }
-.wildcard.mythic { color: var(--rarity-mythic); }
+.wildcard::before { width: 9px; height: 9px; }
+.wc-part::before { width: 5px; height: 5px; }
+
+.wildcard.common, .wc-part.common { color: var(--rarity-common); }
+.wildcard.uncommon, .wc-part.uncommon { color: var(--rarity-uncommon); }
+.wildcard.rare, .wc-part.rare { color: var(--rarity-rare); }
+.wildcard.mythic, .wc-part.mythic { color: var(--rarity-mythic); }
 
 .actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
@@ -232,10 +235,11 @@ input[type="text"], input[type="number"], select {
     .workspace.filters-open .filters { visibility: visible; transform: none; }
 }
 
-/* Narrower still: the wildcard total and craftability carry the decision, so the
-   per-rarity breakdown and the owned bar give up their columns. */
+/* Narrower still: the wildcard cost and craftability carry the decision, so the owned
+   bar gives up its column. The per-rarity split no longer has one to give - it travels
+   with the total now. */
 @media (max-width: 880px) {
-    .deck-table .col-breakdown, .deck-table .col-owned { display: none; }
+    .deck-table .col-owned { display: none; }
 }
 .filter-group { margin-bottom: var(--space-5); }
 .filter-group:last-child { margin-bottom: 0; }
@@ -398,13 +402,18 @@ input[type="text"], input[type="number"], select {
 
 .wc-total.zero { background: var(--positive-soft); border-color: var(--positive); color: var(--positive); }
 
-.wc-breakdown { display: flex; gap: var(--space-2); font-size: 12px; font-variant-numeric: tabular-nums; }
-.wc-breakdown span { display: inline-flex; align-items: center; gap: 3px; }
-.wc-breakdown .c { color: var(--rarity-common); }
-.wc-breakdown .u { color: var(--rarity-uncommon); }
-.wc-breakdown .r { color: var(--rarity-rare); }
-.wc-breakdown .m { color: var(--rarity-mythic); }
-.wc-breakdown .off { color: var(--text-faint); opacity: 0.45; }
+/* Total and composition as one unit: the number that decides anything is not the total
+   alone but what it is made of. */
+.wc-cost { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+.wc-parts { display: inline-flex; gap: 7px; font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* Dimmed, not hidden - "no mythics needed" is worth knowing. */
+.wc-part.off { color: var(--text-faint); opacity: 0.45; }
+
+.wc-cost.large .wc-total { font-size: 20px; min-width: 44px; padding: 5px 12px; }
+.wc-cost.large .wc-parts { font-size: 13px; gap: var(--space-2); }
+.wc-cost.large .wc-part::before { width: 7px; height: 7px; }
 
 .owned-cell { display: flex; align-items: center; gap: var(--space-2); }
 
@@ -689,6 +698,26 @@ input[type="text"], input[type="number"], select {
     color: var(--text-faint);
     margin-bottom: var(--space-1);
 }
+
+/* The cost of the pasted list, shown before the user commits to saving it. */
+.wc-preview {
+    margin-top: var(--space-4);
+    padding: var(--space-3);
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+}
+
+.wc-preview-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+}
+
+.wc-preview .picker-label { margin-bottom: 0; }
+.wc-preview .deck-warning { margin-top: var(--space-2); }
 
 .error-text { color: var(--negative); margin-top: var(--space-3); }
 

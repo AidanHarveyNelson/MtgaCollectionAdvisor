@@ -150,6 +150,42 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
         return sourceId;
     }
 
+    /// <summary>
+    /// What a decklist would cost, without storing it - so the user can decide whether a
+    /// deck is worth keeping before they commit to it.
+    ///
+    /// Deliberately outside RunAsync: this is a read that runs while the user types, and
+    /// taking the operation gate would flicker the status line on every change and could
+    /// block a real operation. Nothing here reaches the store.
+    /// </summary>
+    public async Task<DeckAnalysisResult?> PreviewDeckAsync(FormatDefinition format, string decklist)
+    {
+        if (services is null) return null;
+
+        var cards = ArenaDeckListParser.Parse(decklist);
+        if (cards.Count == 0) return null;
+
+        var draft = new CandidateDeck(
+            SourceId: "preview:unsaved",
+            Name: "",
+            Url: "",
+            FormatKey: format.Key,
+            Popularity: 0,
+            Cards: cards,
+            FetchedAt: DateTimeOffset.UtcNow);
+
+        try
+        {
+            var ranked = await services.DeckRankingService.RankAsync(format, [draft], Collection);
+            return ranked.Count > 0 ? ranked[0] : null;
+        }
+        catch
+        {
+            // A preview that fails must never stop the user saving.
+            return null;
+        }
+    }
+
     /// <summary>Adds a deck pasted by hand (Arena export format) to the candidate pool.</summary>
     public Task ImportDeckAsync(string name, FormatDefinition format, string decklist) =>
         RunAsync("Importing deck", async report =>
