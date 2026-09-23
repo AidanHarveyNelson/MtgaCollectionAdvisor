@@ -59,6 +59,10 @@ and no error.
 report to run later, so the last "Reading deck 150…" can land after the summary line and
 overwrite it in the status bar. `AdvisorSession` has an `ImmediateProgress` for this.
 
+**File downloads are plain `GET` endpoints linked with `<a download>`** (see `/export/*`
+in `Program.cs`). Blazor leaves an anchor with a `download` attribute to the browser; the
+Chromium `--app` window saves it to Downloads. No JS interop, no blob.
+
 ## Testing
 
 Put logic where it can be tested without a UI or a database. Deck-list filtering lives in
