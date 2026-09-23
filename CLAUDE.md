@@ -59,6 +59,12 @@ stays locked on Windows.
 **Escape `LIKE` wildcards when the search term comes from the user.** An unescaped `%`
 turns a prefix search into a full-table match.
 
+**But `ESCAPE` switches off SQLite's `LIKE` index optimisation**, so an escaped `LIKE` scans
+the whole table: results stay correct, only ~200x slower, with no error. For a prefix
+match on an indexed column, write a range instead (`name >= $p AND name < $p || U+10FFFF`,
+see `CardDatabaseStore`): it uses the index and has no wildcards to escape. Check any new
+lookup with `EXPLAIN QUERY PLAN`. `SCAN` means it will not scale.
+
 **Deck sources send explicit nulls where a list is expected.** `System.Text.Json` writes
 those over property initializers, so `= []` on a DTO property does not protect you —
 coalesce at the point of use. Archidekt does this for `categories` on untagged cards.

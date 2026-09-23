@@ -10,4 +10,9 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Lets tests ask SQLite for the plan of the exact SQL the store runs. -->
+    <InternalsVisibleTo Include="MtgaCollectionAdvisor.Core.Tests" />
+  </ItemGroup>
+
 </Project>

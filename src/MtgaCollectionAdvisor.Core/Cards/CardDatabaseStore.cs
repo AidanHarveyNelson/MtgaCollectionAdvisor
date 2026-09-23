@@ -108,14 +108,9 @@ public sealed class CardDatabaseStore(Database database)
 
         await using var connection = await database.OpenAsync(ct);
         await using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT DISTINCT name FROM cards
-            WHERE name LIKE $prefix ESCAPE '\' COLLATE NOCASE
-            ORDER BY name
-            LIMIT $limit
-            """;
-        // The term is user input, so neutralise LIKE's own wildcards before appending ours.
-        command.Parameters.AddWithValue("$prefix", Escape(prefix) + "%");
+        command.CommandText = SearchNamesSql;
+        command.Parameters.AddWithValue("$from", prefix);
+        command.Parameters.AddWithValue("$to", prefix + PastEveryCharacter);
         command.Parameters.AddWithValue("$limit", limit);
 
         var names = new List<string>();
@@ -127,8 +122,30 @@ public sealed class CardDatabaseStore(Database database)
         return names;
     }
 
-    private static string Escape(string term) =>
-        term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+    // Both name lookups are prefix matches written as ranges on ix_cards_name, not LIKE.
+    // SQLite drops its LIKE-to-index optimisation whenever an ESCAPE clause is present,
+    // and user input needs escaping, so a LIKE here scans all ~20k cards on every call:
+    // ~2 ms against ~0.01 ms, per card, per deck. A range also has no wildcards, so
+    // there is nothing in the input to escape.
+    internal const string SearchNamesSql = """
+        SELECT DISTINCT name FROM cards
+        WHERE name >= $from COLLATE NOCASE AND name < $to COLLATE NOCASE
+        ORDER BY name
+        LIMIT $limit
+        """;
+
+    internal const string FindByNameSql = """
+        SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal
+        FROM cards
+        WHERE name = $name COLLATE NOCASE
+        UNION ALL
+        SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal
+        FROM cards
+        WHERE name >= $frontFace COLLATE NOCASE AND name < $frontFaceEnd COLLATE NOCASE
+        """;
+
+    /// <summary>Sorts after any character a card name can contain, closing a prefix range.</summary>
+    private const string PastEveryCharacter = "\U0010FFFF";
 
     /// <summary>
     /// Every Arena printing of a card, by name.
@@ -147,16 +164,12 @@ public sealed class CardDatabaseStore(Database database)
     {
         await using var connection = await database.OpenAsync(ct);
         await using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal
-            FROM cards
-            WHERE name = $name COLLATE NOCASE
-               OR name LIKE $frontFace ESCAPE '\' COLLATE NOCASE
-            """;
+        command.CommandText = FindByNameSql;
         command.Parameters.AddWithValue("$name", name);
-        // The name comes from a pasted decklist, so neutralise LIKE's own wildcards
-        // before appending ours - an unescaped % would match the whole table.
-        command.Parameters.AddWithValue("$frontFace", Escape(name) + " // %");
+        // Every name starting "name // ": '!' is the character right after the space,
+        // so the range ends exactly where that prefix does.
+        command.Parameters.AddWithValue("$frontFace", name + " // ");
+        command.Parameters.AddWithValue("$frontFaceEnd", name + " //!");
 
         var results = new List<CardInfo>();
         await using var reader = await command.ExecuteReaderAsync(ct);
