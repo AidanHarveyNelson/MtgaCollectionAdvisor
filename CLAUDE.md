@@ -21,6 +21,13 @@ main menu, and opening the in-game Collection screen. Do not spend time looking 
 Reading process memory (`Core/Memory/`) is the only route. Wildcard totals *are* still in
 `Player.log` and are read from there.
 
+**The decks saved in Arena *are* in `Player.log`**, unlike the collection. They come in the
+`StartHook` login message, which is also the one carrying wildcard totals: `DeckSummaries`
+(name, `Format` attribute, `IsNetDeck`) and `DecksInternal` (cards by grpId per section,
+including `CommandZone` and `Companions`). About half the list is Wizards' decks: suggested
+decks have `IsNetDeck`, and precons have `?=?Loc/...` names. Arena writes the list only at
+login, so it is stored (`arena_decks`) rather than re-read.
+
 Two traps in the scanner, both fixed and both easy to reintroduce:
 
 - **Chunked reads must overlap.** A collection table straddling a chunk boundary gets split,
