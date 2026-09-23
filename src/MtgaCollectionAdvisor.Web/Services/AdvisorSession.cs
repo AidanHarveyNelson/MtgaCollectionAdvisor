@@ -2,6 +2,7 @@ using MtgaCollectionAdvisor.Core;
 using MtgaCollectionAdvisor.Core.Configuration;
 using MtgaCollectionAdvisor.Core.Creators;
 using MtgaCollectionAdvisor.Core.Decks;
+using MtgaCollectionAdvisor.Core.Export;
 using MtgaCollectionAdvisor.Core.Memory;
 using MtgaCollectionAdvisor.Core.Models;
 
@@ -100,6 +101,9 @@ public sealed class AdvisorSession(AppConfig config) : IAsyncDisposable
     });
 
     public string ExportDeck(CandidateDeck deck) => ArenaDeckListWriter.Write(deck);
+
+    /// <summary>Writes the user's data out for the download endpoints; null before the app has started.</summary>
+    public DataExportService? DataExport => services?.DataExportService;
 
     public bool IsPinned(string sourceId) => Pins.ContainsKey(sourceId);
 
