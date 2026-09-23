@@ -78,9 +78,12 @@ public static class SchemaInitializer
             language       TEXT NOT NULL DEFAULT 'en'
         );
 
-        CREATE TABLE IF NOT EXISTS creator_feed_state (
-            id            INTEGER PRIMARY KEY CHECK (id = 1),
-            refreshed_at  TEXT NOT NULL
+        -- Per channel, so each feed keeps its own schedule and backoff (CreatorFeedSchedule).
+        CREATE TABLE IF NOT EXISTS creator_feeds (
+            creator               TEXT PRIMARY KEY,
+            last_success_at       TEXT,
+            last_attempt_at       TEXT,
+            consecutive_failures  INTEGER NOT NULL
         );
         """;
 

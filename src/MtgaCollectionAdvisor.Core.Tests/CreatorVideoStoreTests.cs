@@ -28,14 +28,19 @@ public sealed class CreatorVideoStoreTests : IAsyncLifetime
     {
         var snapshot = await _store.LoadAsync();
 
-        Assert.Null(snapshot.RefreshedAt);
+        Assert.Empty(snapshot.Feeds);
         Assert.Empty(snapshot.Videos);
     }
 
     [Fact]
-    public async Task Replace_Then_Load_Should_RoundTripVideosAndRefreshTime()
+    public async Task Replace_Then_Load_Should_RoundTripVideosAndFeedStates()
     {
-        var refreshedAt = new DateTimeOffset(2026, 9, 23, 10, 30, 0, TimeSpan.Zero);
+        var at = new DateTimeOffset(2026, 9, 23, 10, 30, 0, TimeSpan.Zero);
+        var feeds = new Dictionary<string, CreatorFeedState>
+        {
+            ["Crokeyz"] = new("Crokeyz", LastSuccessAt: at, LastAttemptAt: at, ConsecutiveFailures: 0),
+            ["Bob"] = new("Bob", LastSuccessAt: null, LastAttemptAt: at, ConsecutiveFailures: 3)
+        };
         var videos = new[]
         {
             Video("inline", DeckSourceKind.InlineList, decklist: "Deck\n4 Shock"),
@@ -44,20 +49,21 @@ public sealed class CreatorVideoStoreTests : IAsyncLifetime
             Video("none", DeckSourceKind.None) with { Language = "pt" }
         };
 
-        await _store.ReplaceAsync(new CreatorVideoSnapshot(refreshedAt, videos));
+        await _store.ReplaceAsync(new CreatorVideoSnapshot(videos, feeds));
         var loaded = await _store.LoadAsync();
 
-        Assert.Equal(refreshedAt, loaded.RefreshedAt);
+        Assert.Equal(feeds["Crokeyz"], loaded.FeedOf("Crokeyz"));
+        Assert.Equal(feeds["Bob"], loaded.FeedOf("Bob"));
         Assert.Equal(videos.OrderBy(v => v.VideoId), loaded.Videos.OrderBy(v => v.VideoId));
     }
 
     [Fact]
     public async Task Replace_Should_RemoveRowsNotInTheNewSnapshot()
     {
-        var at = DateTimeOffset.UtcNow;
-        await _store.ReplaceAsync(new CreatorVideoSnapshot(at, [Video("gone", DeckSourceKind.None), Video("kept", DeckSourceKind.None)]));
+        var none = new Dictionary<string, CreatorFeedState>();
+        await _store.ReplaceAsync(new CreatorVideoSnapshot([Video("gone", DeckSourceKind.None), Video("kept", DeckSourceKind.None)], none));
 
-        await _store.ReplaceAsync(new CreatorVideoSnapshot(at, [Video("kept", DeckSourceKind.None)]));
+        await _store.ReplaceAsync(new CreatorVideoSnapshot([Video("kept", DeckSourceKind.None)], none));
 
         Assert.Equal(["kept"], (await _store.LoadAsync()).Videos.Select(v => v.VideoId));
     }

@@ -102,28 +102,6 @@ public class CreatorVideoMergeTests
         Assert.All(merged, v => Assert.Equal("pt", v.Language));
     }
 
-    [Fact]
-    public void IsStale_Should_FollowMaxAge_When_EveryChannelHasVideos()
-    {
-        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
-        var both = new[] { Stored("a", "Alice", DeckSourceKind.None), Stored("b", "Bob", DeckSourceKind.None) };
-
-        Assert.True(CreatorVideoSnapshot.Empty.IsStale(now, Curated));
-        Assert.False(new CreatorVideoSnapshot(now.AddHours(-1), both).IsStale(now, Curated));
-        Assert.True(new CreatorVideoSnapshot(now - CreatorVideoSnapshot.MaxAge, both).IsStale(now, Curated));
-    }
-
-    [Fact]
-    public void IsStale_Should_RetrySoon_When_AChannelHasNothingCached()
-    {
-        // Bob's first fetch failed: waiting six hours to try again left him missing all day.
-        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
-        var onlyAlice = new[] { Stored("a", "Alice", DeckSourceKind.None) };
-
-        Assert.False(new CreatorVideoSnapshot(now.AddMinutes(-5), onlyAlice).IsStale(now, Curated));
-        Assert.True(new CreatorVideoSnapshot(now - CreatorVideoSnapshot.RetryMissingAfter, onlyAlice).IsStale(now, Curated));
-    }
-
     private static ChannelFeedResult Ok(CreatorChannel channel, params FeedVideo[] videos) => new(channel, videos);
 
     private static ChannelFeedResult Failed(CreatorChannel channel) => new(channel, null);

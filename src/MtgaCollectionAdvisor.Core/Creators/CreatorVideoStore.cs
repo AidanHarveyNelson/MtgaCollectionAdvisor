@@ -13,14 +13,19 @@ public sealed class CreatorVideoStore(Database database)
     {
         await using var connection = await database.OpenAsync(ct);
 
-        DateTimeOffset? refreshedAt = null;
+        var feeds = new Dictionary<string, CreatorFeedState>(StringComparer.Ordinal);
         await using (var state = connection.CreateCommand())
         {
-            state.CommandText = "SELECT refreshed_at FROM creator_feed_state WHERE id = 1";
-            if (await state.ExecuteScalarAsync(ct) is string text
-                && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var at))
+            state.CommandText = "SELECT creator, last_success_at, last_attempt_at, consecutive_failures FROM creator_feeds";
+            await using var reader = await state.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
             {
-                refreshedAt = at;
+                var creator = reader.GetString(0);
+                feeds[creator] = new CreatorFeedState(
+                    creator,
+                    LastSuccessAt: ReadTime(reader, 1),
+                    LastAttemptAt: ReadTime(reader, 2),
+                    ConsecutiveFailures: reader.GetInt32(3));
             }
         }
 
@@ -50,10 +55,19 @@ public sealed class CreatorVideoStore(Database database)
             }
         }
 
-        return new CreatorVideoSnapshot(refreshedAt, videos);
+        return new CreatorVideoSnapshot(videos, feeds);
     }
 
-    /// <summary>Replaces every row and the refresh time together, so a failed save leaves the old cache whole.</summary>
+    private static DateTimeOffset? ReadTime(Microsoft.Data.Sqlite.SqliteDataReader reader, int ordinal) =>
+        !reader.IsDBNull(ordinal)
+        && DateTimeOffset.TryParse(reader.GetString(ordinal), CultureInfo.InvariantCulture, DateTimeStyles.None, out var at)
+            ? at
+            : null;
+
+    private static object Time(DateTimeOffset? at) =>
+        at is { } value ? value.ToString("O", CultureInfo.InvariantCulture) : DBNull.Value;
+
+    /// <summary>Replaces every video and feed row together, so a failed save leaves the old cache whole.</summary>
     public async Task ReplaceAsync(CreatorVideoSnapshot snapshot, CancellationToken ct = default)
     {
         await using var connection = await database.OpenAsync(ct);
@@ -90,21 +104,27 @@ public sealed class CreatorVideoStore(Database database)
             }
         }
 
-        await using (var state = connection.CreateCommand())
+        await using (var clearFeeds = connection.CreateCommand())
         {
-            if (snapshot.RefreshedAt is { } at)
+            clearFeeds.CommandText = "DELETE FROM creator_feeds";
+            await clearFeeds.ExecuteNonQueryAsync(ct);
+        }
+
+        await using (var feed = connection.CreateCommand())
+        {
+            feed.CommandText = """
+                INSERT INTO creator_feeds (creator, last_success_at, last_attempt_at, consecutive_failures)
+                VALUES ($creator, $success, $attempt, $failures)
+                """;
+            foreach (var state in snapshot.Feeds.Values)
             {
-                state.CommandText = """
-                    INSERT INTO creator_feed_state (id, refreshed_at) VALUES (1, $at)
-                    ON CONFLICT (id) DO UPDATE SET refreshed_at = excluded.refreshed_at
-                    """;
-                state.Parameters.AddWithValue("$at", at.ToString("O", CultureInfo.InvariantCulture));
+                feed.Parameters.Clear();
+                feed.Parameters.AddWithValue("$creator", state.Creator);
+                feed.Parameters.AddWithValue("$success", Time(state.LastSuccessAt));
+                feed.Parameters.AddWithValue("$attempt", Time(state.LastAttemptAt));
+                feed.Parameters.AddWithValue("$failures", Math.Max(0, state.ConsecutiveFailures));
+                await feed.ExecuteNonQueryAsync(ct);
             }
-            else
-            {
-                state.CommandText = "DELETE FROM creator_feed_state";
-            }
-            await state.ExecuteNonQueryAsync(ct);
         }
 
         await transaction.CommitAsync(ct);

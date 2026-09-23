@@ -21,30 +21,61 @@ public sealed class CreatorVideoService(
     CreatorVideoStore store,
     DeckRankingService ranking)
 {
+    /// <summary>Spacing between feed requests: one at a time, never a burst YouTube could read as abuse.</summary>
+    private static readonly TimeSpan RequestSpacing = TimeSpan.FromMilliseconds(300);
+
     /// <summary>
-    /// The cached videos if the cache is fresh and <paramref name="force"/> is false;
-    /// otherwise every curated feed is fetched and merged into the cache. A feed or
-    /// Archidekt failure never throws: it leaves what the cache already knew.
+    /// Fetches only the channels whose feed is due (<see cref="CreatorFeedSchedule"/>), one
+    /// at a time, and keeps the rest from the cache; <paramref name="force"/> - the user's
+    /// Refresh - asks every channel. A feed or Archidekt failure never throws: it leaves
+    /// what the cache already knew and pushes that channel's next attempt back.
     /// </summary>
     public async Task<CreatorVideoRefreshResult> LoadAsync(bool force, CancellationToken ct = default)
     {
         var cached = await store.LoadAsync(ct);
-        if (!force && !cached.IsStale(DateTimeOffset.UtcNow, CreatorChannels.All))
+        var now = DateTimeOffset.UtcNow;
+
+        var due = CreatorChannels.All
+            .Where(c => force || CreatorFeedSchedule.IsDue(cached.FeedOf(c.Name), now))
+            .Select(c => c.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        if (due.Count == 0)
         {
             return new CreatorVideoRefreshResult(cached.Videos, FromCache: true, FailedFeeds: 0, ArchidektFetches: 0);
         }
 
-        var results = await Task.WhenAll(CreatorChannels.All.Select(async channel =>
+        var results = new List<ChannelFeedResult>(CreatorChannels.All.Count);
+        var feedStates = new Dictionary<string, CreatorFeedState>(StringComparer.Ordinal);
+        var asked = 0;
+        var failedFeeds = 0;
+
+        foreach (var channel in CreatorChannels.All)
         {
+            if (!due.Contains(channel.Name))
+            {
+                // Not asked this time: a null result makes Merge keep what the cache has.
+                results.Add(new ChannelFeedResult(channel, null));
+                if (cached.FeedOf(channel.Name) is { } kept) feedStates[channel.Name] = kept;
+                continue;
+            }
+
+            if (asked++ > 0) await Task.Delay(RequestSpacing, ct);
+
+            IReadOnlyList<FeedVideo>? videos;
             try
             {
-                return new ChannelFeedResult(channel, await feeds.FetchAsync(channel, ct));
+                videos = await feeds.FetchAsync(channel, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
-                return new ChannelFeedResult(channel, null);
+                videos = null;
+                failedFeeds++;
             }
-        }));
+
+            results.Add(new ChannelFeedResult(channel, videos));
+            feedStates[channel.Name] = CreatorFeedSchedule.Record(
+                cached.FeedOf(channel.Name), channel.Name, succeeded: videos is not null, DateTimeOffset.UtcNow);
+        }
 
         var merged = CreatorVideoMerge.Merge(cached.Videos, results, CreatorChannels.All).ToList();
 
@@ -63,12 +94,12 @@ public sealed class CreatorVideoService(
             }
         }
 
-        await store.ReplaceAsync(new CreatorVideoSnapshot(DateTimeOffset.UtcNow, merged), ct);
+        await store.ReplaceAsync(new CreatorVideoSnapshot(merged, feedStates), ct);
 
         return new CreatorVideoRefreshResult(
             merged,
             FromCache: false,
-            FailedFeeds: results.Count(r => r.Videos is null),
+            FailedFeeds: failedFeeds,
             ArchidektFetches: archidektFetches);
     }
 
