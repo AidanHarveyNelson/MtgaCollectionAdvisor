@@ -59,6 +59,20 @@ public static class ArenaDeckImport
             .ThenBy(c => c.Deck.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+    /// <summary>The picker's format filter value for decks in formats the app does not rank.</summary>
+    public const string OtherFormats = "other";
+
+    /// <summary>
+    /// The choices under one filter: a format key, <see cref="OtherFormats"/> for the
+    /// unsupported ones, or null for everything.
+    /// </summary>
+    public static IReadOnlyList<ArenaDeckChoice> Filter(IReadOnlyList<ArenaDeckChoice> choices, string? filter) => filter switch
+    {
+        null => choices,
+        OtherFormats => choices.Where(c => !c.IsSupported).ToList(),
+        _ => choices.Where(c => c.Format?.Key == filter).ToList(),
+    };
+
     /// <summary>The deck as a user deck, or null when its format is not supported.</summary>
     public static CandidateDeck? ToCandidateDeck(ArenaDeck deck, IReadOnlyDictionary<int, string> names, DateTimeOffset now)
     {

@@ -103,6 +103,22 @@ public class ArenaDeckImportTests
     }
 
     [Fact]
+    public void Filter_Should_SelectByFormat_Other_OrAll()
+    {
+        var choices = ArenaDeckImport.Choices([
+            Deck("s", "Mono Red", "Standard"),
+            Deck("e", "Lotus Field", "Explorer"),
+            Deck("h", "Zombies", "Historic"),
+            Deck("a", "Alchemy thing", "Alchemy"),
+        ], Names, NothingInApp);
+
+        Assert.Equal(4, ArenaDeckImport.Filter(choices, null).Count);
+        Assert.Equal(["s"], ArenaDeckImport.Filter(choices, Formats.Standard.Key).Select(c => c.Deck.Id));
+        Assert.Equal(["e"], ArenaDeckImport.Filter(choices, Formats.Pioneer.Key).Select(c => c.Deck.Id));
+        Assert.Equal(["a", "h"], ArenaDeckImport.Filter(choices, ArenaDeckImport.OtherFormats).Select(c => c.Deck.Id).Order());
+    }
+
+    [Fact]
     public void ToCandidateDeck_Should_BeNull_ForUnsupportedFormats()
     {
         Assert.Null(ArenaDeckImport.ToCandidateDeck(Deck("h", "Zombies", "Historic"), Names, Now));

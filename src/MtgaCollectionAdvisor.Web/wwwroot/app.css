@@ -744,8 +744,11 @@ button.arena-link {
 }
 button.arena-link span { color: var(--text-muted); font-size: 12px; }
 
+.arena-filter { margin-top: var(--space-3); }
+.arena-filter .count { color: var(--text-faint); font-size: 12px; margin-left: 2px; }
+
 .arena-picker {
-    margin-top: var(--space-3);
+    margin-top: var(--space-2);
     display: flex;
     flex-direction: column;
     gap: 2px;

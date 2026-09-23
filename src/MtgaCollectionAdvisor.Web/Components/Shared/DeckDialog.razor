@@ -22,8 +22,20 @@
             }
             else
             {
+                @* Ticks survive a filter change: the Add button counts every picked deck. *@
+                <div class="segmented arena-filter">
+                    @foreach (var (key, label) in ArenaFilters())
+                    {
+                        var count = ArenaDeckImport.Filter(_arenaChoices, key).Count;
+                        <button class="@(_arenaFilter == key ? "active" : "")" disabled="@(count == 0)"
+                                @onclick="() => _arenaFilter = key">
+                            @label <span class="count">@count</span>
+                        </button>
+                    }
+                </div>
+
                 <div class="arena-picker">
-                    @foreach (var choice in _arenaChoices)
+                    @foreach (var choice in ArenaDeckImport.Filter(_arenaChoices, _arenaFilter))
                     {
                         var id = choice.Deck.Id;
                         <label class="arena-deck @(choice.IsSupported ? "" : "unsupported")">
@@ -241,10 +253,19 @@
     private IReadOnlyList<ArenaDeckChoice>? _arenaChoices;
     private readonly HashSet<string> _picked = [];
 
+    /// <summary>A format key, <see cref="ArenaDeckImport.OtherFormats"/>, or null for all.</summary>
+    private string? _arenaFilter;
+
+    private static IEnumerable<(string? Key, string Label)> ArenaFilters() =>
+        [(null, "All"), .. Formats.All.Select(f => ((string?)f.Key, f.DisplayName)), (ArenaDeckImport.OtherFormats, "Other")];
+
     private async Task OpenArenaDecksAsync()
     {
         _picked.Clear();
         _arenaChoices = await Session.GetArenaDeckChoicesAsync();
+
+        // Open on the format the user is looking at, unless they have no decks in it.
+        _arenaFilter = ArenaDeckImport.Filter(_arenaChoices, Session.Format.Key).Count > 0 ? Session.Format.Key : null;
     }
 
     private void TogglePick(string arenaDeckId)
