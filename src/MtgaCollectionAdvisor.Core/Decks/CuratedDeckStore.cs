@@ -6,52 +6,204 @@ namespace MtgaCollectionAdvisor.Core.Decks;
 
 /// <summary>
 /// Stores the pool of candidate decks - both the ones fetched automatically and the
-/// ones the user pasted in by hand. Auto-fetched decks are replaced wholesale on each
-/// refresh; manual ones are only ever added or deleted individually.
+/// ones the user pasted in by hand. Fetched decks are merged in as a source lists them
+/// and pruned once they fall out of its window; manual ones are only ever added or
+/// deleted individually. A pinned deck is never written, updated or deleted by a fetch:
+/// the user is tracking it as it was when pinned.
 /// </summary>
 public sealed class CuratedDeckStore(Database database)
 {
+    /// <summary>The source version of every deck read in detail for a format, kept or rejected.</summary>
+    public async Task<IReadOnlyDictionary<string, DateTimeOffset>> LoadSourceVersionsAsync(
+        FormatDefinition format, CancellationToken ct = default)
+    {
+        await using var connection = await database.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT source_id, source_updated_at FROM source_deck_versions WHERE format_key = $format";
+        command.Parameters.AddWithValue("$format", format.Key);
+
+        var versions = new Dictionary<string, DateTimeOffset>();
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            versions[reader.GetString(0)] = DateTimeOffset.Parse(reader.GetString(1));
+        }
+        return versions;
+    }
+
     /// <summary>
-    /// Replaces every previously auto-fetched deck for a format (source ids starting
-    /// with <paramref name="sourcePrefix"/>, e.g. "archidekt:") with a fresh batch,
-    /// leaving manually-imported decks for that format untouched.
+    /// Records what a fetch read and merges the kept decks into the pool: new ones added,
+    /// changed ones replaced. A rejected deck (<see cref="FetchedDeck.Deck"/> null) takes its
+    /// stored copy with it. Pinned decks are skipped entirely.
     /// </summary>
-    public async Task ReplaceAutoFetchedAsync(
-        FormatDefinition format, string sourcePrefix, IReadOnlyList<CandidateDeck> decks, CancellationToken ct = default)
+    public async Task<DeckMergeResult> MergeFetchedAsync(
+        FormatDefinition format, IReadOnlyList<FetchedDeck> fetched, CancellationToken ct = default)
     {
         await using var connection = await database.OpenAsync(ct);
         await using var transaction = await connection.BeginTransactionAsync(ct);
 
-        await using (var clear = connection.CreateCommand())
-        {
-            // Pinned decks are spared: the user is tracking them, and a deck dropped by the
-            // source would otherwise vanish mid-progress.
-            clear.CommandText = """
-                DELETE FROM decks
-                WHERE format_key = $format AND source_id LIKE $prefix
-                  AND source_id NOT IN (SELECT source_id FROM pinned_decks)
-                """;
-            clear.Parameters.AddWithValue("$format", format.Key);
-            clear.Parameters.AddWithValue("$prefix", sourcePrefix + "%");
-            await clear.ExecuteNonQueryAsync(ct);
-        }
+        var pinned = await LoadPinnedIdsAsync(connection, ct);
+        int added = 0, updated = 0;
 
-        foreach (var deck in decks)
+        foreach (var item in fetched)
         {
-            // A spared pinned deck is still in this batch, so replace it rather than
-            // colliding on the primary key - its contents should track the source.
-            await using (var replace = connection.CreateCommand())
+            if (pinned.Contains(item.SourceId)) continue;
+
+            await using (var version = connection.CreateCommand())
             {
-                replace.CommandText = "DELETE FROM decks WHERE source_id = $id";
-                replace.Parameters.AddWithValue("$id", deck.SourceId);
-                await replace.ExecuteNonQueryAsync(ct);
+                version.CommandText = """
+                    INSERT INTO source_deck_versions (source_id, format_key, source_updated_at, kept)
+                    VALUES ($id, $format, $updatedAt, $kept)
+                    ON CONFLICT (source_id) DO UPDATE SET
+                        format_key = excluded.format_key,
+                        source_updated_at = excluded.source_updated_at,
+                        kept = excluded.kept
+                    """;
+                version.Parameters.AddWithValue("$id", item.SourceId);
+                version.Parameters.AddWithValue("$format", format.Key);
+                version.Parameters.AddWithValue("$updatedAt", ToStored(item.SourceUpdatedAt));
+                version.Parameters.AddWithValue("$kept", item.Deck is null ? 0 : 1);
+                await version.ExecuteNonQueryAsync(ct);
             }
 
-            await InsertDeckAsync(connection, deck, ct);
+            bool existed;
+            await using (var delete = connection.CreateCommand())
+            {
+                delete.CommandText = "DELETE FROM decks WHERE source_id = $id";
+                delete.Parameters.AddWithValue("$id", item.SourceId);
+                existed = await delete.ExecuteNonQueryAsync(ct) > 0;
+            }
+
+            if (item.Deck is null) continue;
+
+            await InsertDeckAsync(connection, item.Deck, ct);
+            if (existed) updated++; else added++;
         }
 
         await transaction.CommitAsync(ct);
+        return new DeckMergeResult(added, updated);
     }
+
+    /// <summary>
+    /// Removes the fetched decks of a format whose last update is before
+    /// <paramref name="cutoff"/>, and those stored before versions were recorded. Pinned
+    /// decks and the user's own are never removed. Returns how many decks went.
+    /// </summary>
+    public async Task<int> PruneFetchedAsync(
+        FormatDefinition format, string sourcePrefix, DateTimeOffset cutoff, CancellationToken ct = default)
+    {
+        await using var connection = await database.OpenAsync(ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+
+        int removed;
+        await using (var decks = connection.CreateCommand())
+        {
+            decks.CommandText = """
+                DELETE FROM decks
+                WHERE format_key = $format AND source_id LIKE $prefix
+                  AND source_id NOT IN (SELECT source_id FROM pinned_decks)
+                  AND source_id NOT IN (
+                      SELECT source_id FROM source_deck_versions
+                      WHERE kept = 1 AND source_updated_at >= $cutoff)
+                """;
+            decks.Parameters.AddWithValue("$format", format.Key);
+            decks.Parameters.AddWithValue("$prefix", sourcePrefix + "%");
+            decks.Parameters.AddWithValue("$cutoff", ToStored(cutoff));
+            removed = await decks.ExecuteNonQueryAsync(ct);
+        }
+
+        // Versions out of the window are never consulted again: the walk stops before them.
+        await using (var versions = connection.CreateCommand())
+        {
+            versions.CommandText = """
+                DELETE FROM source_deck_versions
+                WHERE format_key = $format AND source_updated_at < $cutoff
+                """;
+            versions.Parameters.AddWithValue("$format", format.Key);
+            versions.Parameters.AddWithValue("$cutoff", ToStored(cutoff));
+            await versions.ExecuteNonQueryAsync(ct);
+        }
+
+        await transaction.CommitAsync(ct);
+        return removed;
+    }
+
+    /// <summary>
+    /// Removes fetched decks by id - duplicates of a more popular list. Their versions stay
+    /// recorded, so an unchanged duplicate is not read again. Pinned and user decks are
+    /// never removed.
+    /// </summary>
+    public async Task<int> RemoveFetchedAsync(IReadOnlyCollection<string> sourceIds, CancellationToken ct = default)
+    {
+        if (sourceIds.Count == 0) return 0;
+
+        await using var connection = await database.OpenAsync(ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            DELETE FROM decks
+            WHERE source_id = $id
+              AND source_id NOT LIKE $manual
+              AND source_id NOT IN (SELECT source_id FROM pinned_decks)
+            """;
+        var idParameter = command.Parameters.Add("$id", SqliteType.Text);
+        command.Parameters.AddWithValue("$manual", CandidateDeck.ManualSourcePrefix + "%");
+
+        var removed = 0;
+        foreach (var id in sourceIds)
+        {
+            idParameter.Value = id;
+            removed += await command.ExecuteNonQueryAsync(ct);
+        }
+
+        await transaction.CommitAsync(ct);
+        return removed;
+    }
+
+    public async Task<DeckSyncState> LoadSyncStateAsync(FormatDefinition format, CancellationToken ct = default)
+    {
+        await using var connection = await database.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT last_sync_at, full_walk_at FROM deck_sync_state WHERE format_key = $format";
+        command.Parameters.AddWithValue("$format", format.Key);
+
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct)) return new DeckSyncState(null, null);
+
+        return new DeckSyncState(
+            reader.IsDBNull(0) ? null : DateTimeOffset.Parse(reader.GetString(0)),
+            reader.IsDBNull(1) ? null : DateTimeOffset.Parse(reader.GetString(1)));
+    }
+
+    public async Task SaveSyncStateAsync(FormatDefinition format, DeckSyncState state, CancellationToken ct = default)
+    {
+        await using var connection = await database.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO deck_sync_state (format_key, last_sync_at, full_walk_at)
+            VALUES ($format, $lastSync, $fullWalk)
+            ON CONFLICT (format_key) DO UPDATE SET
+                last_sync_at = excluded.last_sync_at,
+                full_walk_at = excluded.full_walk_at
+            """;
+        command.Parameters.AddWithValue("$format", format.Key);
+        command.Parameters.AddWithValue("$lastSync", state.LastSyncAt is { } s ? ToStored(s) : DBNull.Value);
+        command.Parameters.AddWithValue("$fullWalk", state.FullWalkAt is { } w ? ToStored(w) : DBNull.Value);
+        await command.ExecuteNonQueryAsync(ct);
+    }
+
+    private static async Task<HashSet<string>> LoadPinnedIdsAsync(SqliteConnection connection, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT source_id FROM pinned_decks";
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct)) ids.Add(reader.GetString(0));
+        return ids;
+    }
+
+    /// <summary>UTC and round-trip format, so stored timestamps compare correctly as text in SQL.</summary>
+    private static string ToStored(DateTimeOffset value) => value.ToUniversalTime().ToString("O");
 
     public async Task AddDeckAsync(CandidateDeck deck, CancellationToken ct = default)
     {
@@ -113,8 +265,8 @@ public sealed class CuratedDeckStore(Database database)
     /// pin on it survives - re-importing mints a new id and takes the pin's baseline with
     /// it, which is the whole reason this exists.
     ///
-    /// Refuses anything but a manual deck: an auto-fetched one is overwritten wholesale on
-    /// the next refresh, so the edit would vanish without a word.
+    /// Refuses anything but a manual deck: a fetched one is overwritten when its source
+    /// changes it, so the edit would vanish without a word.
     /// </summary>
     public async Task UpdateUserDeckAsync(CandidateDeck deck, CancellationToken ct = default)
     {
@@ -207,3 +359,14 @@ public sealed class CuratedDeckStore(Database database)
             .ToList();
     }
 }
+
+/// <summary>
+/// A deck a fetch read in detail, with the source's own last-update time.
+/// <see cref="Deck"/> is null when it was read and rejected.
+/// </summary>
+public sealed record FetchedDeck(string SourceId, DateTimeOffset SourceUpdatedAt, CandidateDeck? Deck);
+
+public sealed record DeckMergeResult(int Added, int Updated);
+
+/// <summary>When a format was last fetched, and when a fetch last walked the whole window.</summary>
+public sealed record DeckSyncState(DateTimeOffset? LastSyncAt, DateTimeOffset? FullWalkAt);

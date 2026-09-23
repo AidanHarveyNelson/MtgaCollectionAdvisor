@@ -42,7 +42,7 @@
                 Capture collection
             </button>
             <button disabled="@Session.IsBusy"
-                    title="Downloads public @Session.Format.DisplayName decks from Archidekt, dropping duplicate lists."
+                    title="Adds the latest public @Session.Format.DisplayName decks from Archidekt to the pool, reading only what is new or changed since the last fetch. Pinned decks are never touched."
                     @onclick="() => Session.FetchDecksAsync()">
                 Fetch decks
             </button>

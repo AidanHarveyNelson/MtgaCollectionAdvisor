@@ -78,15 +78,9 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
 
     public Task FetchDecksAsync() => RunAsync($"Fetching {Format.DisplayName} decks", async report =>
     {
-        var format = Format;
-        report($"Querying Archidekt ({format.DisplayName})...");
-        var decks = await services.ArchidektClient.FetchTopDecksAsync(format, count: 60);
-
-        var unique = DeckDeduplicator.Deduplicate(decks);
-        report($"{decks.Count} decks received, {unique.Count} after removing duplicate lists.");
-
-        await services.CuratedDeckStore.ReplaceAutoFetchedAsync(format, ArchidektClient.SourcePrefix, unique);
+        var result = await services.ArchidektDeckSync.SyncAsync(Format, new ImmediateProgress(report));
         await ReloadRankingAsync();
+        report(result.Describe());
     });
 
     public Task RefreshCardDatabaseAsync() => RunAsync("Updating card database", async report =>
@@ -389,6 +383,15 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
     }
 
     private void Notify() => Changed?.Invoke();
+
+    /// <summary>
+    /// Reports on the calling thread. <see cref="Progress{T}"/> posts each report for later,
+    /// so a late one can land after the final summary and overwrite it in the status bar.
+    /// </summary>
+    private sealed class ImmediateProgress(Action<string> report) : IProgress<string>
+    {
+        public void Report(string value) => report(value);
+    }
 
     public void Dispose()
     {
