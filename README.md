@@ -1,4 +1,6 @@
-# MTGA Collection Advisor
+# MTGA Deck Advisor
+
+*Find the decks your collection can build — and what the rest will cost.*
 
 Ranks MTG Arena decks by **how few wildcards you need to finish them**, based on the cards
 you actually own. Standard and Pioneer.

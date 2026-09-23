@@ -1,7 +1,7 @@
 {
-  "name": "MTGA Collection Advisor",
+  "name": "MTGA Deck Advisor",
   "short_name": "MTGA Advisor",
-  "description": "Suggests MTG Arena decks you can build, ranked by the fewest wildcards needed.",
+  "description": "Find the decks your collection can build — and what the rest will cost.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0e1116",
