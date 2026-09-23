@@ -109,8 +109,10 @@ input[type="text"], input[type="number"], select {
     flex-wrap: wrap;
 }
 
-.brand { display: flex; align-items: baseline; gap: var(--space-2); font-size: 16px; font-weight: 700; }
-.brand span { color: var(--accent); }
+.brand { display: flex; flex-direction: column; line-height: 1.25; }
+.brand-name { font-size: 16px; font-weight: 700; }
+.brand-name span { color: var(--accent); }
+.brand-tagline { font-size: 12px; color: var(--text-faint); }
 
 .topbar-stats { display: flex; gap: var(--space-5); margin-left: auto; align-items: center; flex-wrap: wrap; }
 
