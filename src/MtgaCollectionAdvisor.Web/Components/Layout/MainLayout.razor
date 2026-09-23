@@ -6,6 +6,16 @@
     <header class="topbar">
         <div class="brand">MTGA <span>Collection Advisor</span></div>
 
+        @* Only when there is somewhere else to go: with the Creators tab off, the top bar
+           is exactly what it was before it existed. *@
+        @if (Session.CreatorVideosEnabled)
+        {
+            <nav class="topnav">
+                <NavLink href="" Match="NavLinkMatch.All">Decks</NavLink>
+                <NavLink href="creators">Creators</NavLink>
+            </nav>
+        }
+
         <div class="topbar-stats">
             <div class="stat">
                 <span class="stat-label">Collection</span>

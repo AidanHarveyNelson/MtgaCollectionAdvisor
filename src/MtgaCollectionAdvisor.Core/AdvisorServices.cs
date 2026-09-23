@@ -1,6 +1,7 @@
 using MtgaCollectionAdvisor.Core.Analysis;
 using MtgaCollectionAdvisor.Core.Cards;
 using MtgaCollectionAdvisor.Core.Configuration;
+using MtgaCollectionAdvisor.Core.Creators;
 using MtgaCollectionAdvisor.Core.Decks;
 using MtgaCollectionAdvisor.Core.Logs;
 using MtgaCollectionAdvisor.Core.Memory;
@@ -29,6 +30,9 @@ public sealed class AdvisorServices : IAsyncDisposable
     public ScryfallBulkImporter ScryfallBulkImporter { get; }
     public HttpClient ArchidektHttpClient { get; }
     public ArchidektClient ArchidektClient { get; }
+    public HttpClient YouTubeHttpClient { get; }
+    public CreatorVideoStore CreatorVideoStore { get; }
+    public CreatorVideoService CreatorVideoService { get; }
 
     private AdvisorServices(AppConfig config)
     {
@@ -49,6 +53,11 @@ public sealed class AdvisorServices : IAsyncDisposable
 
         ArchidektHttpClient = ArchidektClient.CreateHttpClient();
         ArchidektClient = new ArchidektClient(ArchidektHttpClient);
+
+        YouTubeHttpClient = YouTubeFeedClient.CreateHttpClient();
+        CreatorVideoStore = new CreatorVideoStore(Database);
+        CreatorVideoService = new CreatorVideoService(
+            new YouTubeFeedClient(YouTubeHttpClient), ArchidektClient, CreatorVideoStore, DeckRankingService);
     }
 
     public static async Task<AdvisorServices> CreateAsync(AppConfig config, CancellationToken ct = default)
@@ -63,6 +72,7 @@ public sealed class AdvisorServices : IAsyncDisposable
         PlayerLogWatcher.Dispose();
         ScryfallHttpClient.Dispose();
         ArchidektHttpClient.Dispose();
+        YouTubeHttpClient.Dispose();
         return ValueTask.CompletedTask;
     }
 }

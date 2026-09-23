@@ -26,6 +26,7 @@ public static partial class ArenaDeckListParser
     {
         var result = new List<DeckCardRef>();
         var board = DeckBoard.Main;
+        var inCompanion = false;
 
         foreach (var rawLine in text.Split('\n'))
         {
@@ -34,13 +35,29 @@ public static partial class ArenaDeckListParser
 
             if (line.Equals("Deck", StringComparison.OrdinalIgnoreCase) ||
                 line.Equals("Commander", StringComparison.OrdinalIgnoreCase))
+            {
+                board = DeckBoard.Main;
+                inCompanion = false;
                 continue;
+            }
 
             if (line.Equals("Sideboard", StringComparison.OrdinalIgnoreCase))
             {
                 board = DeckBoard.Sideboard;
+                inCompanion = false;
                 continue;
             }
+
+            // Arena's export lists the companion in its own section *and* again in the
+            // sideboard, where it actually lives. Counting the section too made a 60-card
+            // deck read as 61 in the mainboard.
+            if (line.Equals("Companion", StringComparison.OrdinalIgnoreCase))
+            {
+                inCompanion = true;
+                continue;
+            }
+
+            if (inCompanion) continue;
 
             var match = CardLineRegex().Match(line);
             if (!match.Success) continue;

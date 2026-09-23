@@ -1,3 +1,4 @@
+@using MtgaCollectionAdvisor.Core.Creators
 @using MtgaCollectionAdvisor.Core.Models
 @inject AdvisorSession Session
 
@@ -15,7 +16,16 @@
             @if (!string.IsNullOrWhiteSpace(Deck.Deck.Url))
             {
                 <a href="@Deck.Deck.Url" target="_blank" rel="noopener">
-                    <button>Open source</button>
+                    @* A deck brought in from a creator video points back at the video: the
+                       creator is the reason the deck is here, so that is where it sends people. *@
+                    @if (CreatorVideo.IsVideoUrl(Deck.Deck.Url))
+                    {
+                        <button>▶ Watch video</button>
+                    }
+                    else
+                    {
+                        <button>Open source</button>
+                    }
                 </a>
             }
             <button class="primary" @onclick="OnCopy">@(Copied ? "Copied!" : "Copy for Arena")</button>

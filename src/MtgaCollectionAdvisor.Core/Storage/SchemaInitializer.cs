@@ -62,6 +62,26 @@ public static class SchemaInitializer
             quantity   INTEGER NOT NULL,
             PRIMARY KEY (source_id, card_name, board)
         );
+
+        -- Creator videos: what each video's description told us, so neither its feed nor
+        -- Archidekt is asked again. The description itself is not kept.
+        CREATE TABLE IF NOT EXISTS creator_videos (
+            video_id       TEXT PRIMARY KEY,
+            creator        TEXT NOT NULL,
+            title          TEXT NOT NULL,
+            published_at   TEXT NOT NULL,
+            source_kind    TEXT NOT NULL,
+            decklist       TEXT,
+            archidekt_id   INTEGER,
+            external_site  TEXT,
+            external_url   TEXT,
+            language       TEXT NOT NULL DEFAULT 'en'
+        );
+
+        CREATE TABLE IF NOT EXISTS creator_feed_state (
+            id            INTEGER PRIMARY KEY CHECK (id = 1),
+            refreshed_at  TEXT NOT NULL
+        );
         """;
 
     public static async Task EnsureCreatedAsync(Database database, CancellationToken ct = default)
