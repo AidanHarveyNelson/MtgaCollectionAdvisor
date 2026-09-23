@@ -295,6 +295,18 @@ input[type="text"], input[type="number"], select {
 .checkbox-row input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 .hint { color: var(--text-faint); font-size: 12px; margin-top: var(--space-1); }
 
+/* One input per rarity, labelled in the same colours as the wildcard breakdown. Two
+   columns, not four: the filter panel is too narrow to fit "Uncommon" above a quarter of it. */
+.rarity-budget { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
+.rarity-budget label { display: flex; flex-direction: column; gap: var(--space-1); font-size: 11px; min-width: 0; }
+.rarity-budget input { padding: 5px 6px; }
+
+.owned-threshold { display: flex; align-items: center; gap: var(--space-3); }
+.owned-threshold input { flex: 1; }
+.owned-threshold-value { min-width: 3.5ch; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+input[type="range"] { accent-color: var(--accent); }
+
 /* ---------- Deck list ---------- */
 
 .list-header {

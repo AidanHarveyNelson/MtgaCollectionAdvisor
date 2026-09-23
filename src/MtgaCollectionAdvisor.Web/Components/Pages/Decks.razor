@@ -83,8 +83,46 @@
                 <div class="filter-title">Wildcard budget</div>
                 <input type="number" min="0" step="1" placeholder="no limit"
                        value="@_maxWildcards"
-                       @onchange="e => _maxWildcards = int.TryParse(e.Value?.ToString(), out var v) ? v : null" />
+                       @onchange="e => { _maxWildcards = ParseCap(e); _page = 1; }" />
             </div>
+
+            <div style="margin-top: var(--space-3)">
+                <div class="filter-title">Per-rarity budget</div>
+                <div class="rarity-budget">
+                    <label>
+                        <span class="wc-part common">Common</span>
+                        <input type="number" min="0" step="1" placeholder="any" value="@_maxCommons"
+                               @onchange="e => { _maxCommons = ParseCap(e); _page = 1; }" />
+                    </label>
+                    <label>
+                        <span class="wc-part uncommon">Uncommon</span>
+                        <input type="number" min="0" step="1" placeholder="any" value="@_maxUncommons"
+                               @onchange="e => { _maxUncommons = ParseCap(e); _page = 1; }" />
+                    </label>
+                    <label>
+                        <span class="wc-part rare">Rare</span>
+                        <input type="number" min="0" step="1" placeholder="any" value="@_maxRares"
+                               @onchange="e => { _maxRares = ParseCap(e); _page = 1; }" />
+                    </label>
+                    <label>
+                        <span class="wc-part mythic">Mythic</span>
+                        <input type="number" min="0" step="1" placeholder="any" value="@_maxMythics"
+                               @onchange="e => { _maxMythics = ParseCap(e); _page = 1; }" />
+                    </label>
+                </div>
+                <div class="hint">At most this many of each. Blank is no limit; 0 means none needed.</div>
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <div class="filter-title">Owned</div>
+            <div class="owned-threshold">
+                <input type="range" min="0" max="100" step="5" value="@_minOwnedPercent"
+                       aria-label="Minimum share of the list already owned"
+                       @oninput="e => { _minOwnedPercent = int.TryParse(e.Value?.ToString(), out var v) ? v : 0; _page = 1; }" />
+                <span class="owned-threshold-value">@(_minOwnedPercent)%</span>
+            </div>
+            <div class="hint">At least this much of the list already yours.</div>
         </div>
 
         <div class="filter-group">
@@ -309,6 +347,13 @@
     private bool _exactColors;
     private bool _onlyCraftable;
     private int? _maxWildcards;
+    private int? _maxCommons;
+    private int? _maxUncommons;
+    private int? _maxRares;
+    private int? _maxMythics;
+
+    /// <summary>Whole percent, 0-100. Zero means no threshold.</summary>
+    private int _minOwnedPercent;
     private string _search = string.Empty;
     private bool _onlyPinned;
     private IReadOnlyList<string> _containsCards = [];
@@ -390,6 +435,11 @@
         _exactColors = false;
         _onlyCraftable = false;
         _maxWildcards = null;
+        _maxCommons = null;
+        _maxUncommons = null;
+        _maxRares = null;
+        _maxMythics = null;
+        _minOwnedPercent = 0;
         _search = string.Empty;
         _containsCards = [];
         _excludesCards = [];
@@ -412,6 +462,10 @@
         _containsCards = _containsCards.Where(c => !cards.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
         _page = 1;
     }
+
+    /// <summary>A blank or unparseable number input is "no limit", never zero.</summary>
+    private static int? ParseCap(ChangeEventArgs e) =>
+        int.TryParse(e.Value?.ToString(), out var v) ? v : null;
 
     private bool HasActiveFilters => !BuildCriteria().IsEmpty;
 
@@ -457,6 +511,8 @@
         ExactColors = _exactColors,
         OnlyCraftable = _onlyCraftable,
         MaxWildcards = _maxWildcards,
+        RarityBudget = new RarityBudget(_maxCommons, _maxUncommons, _maxRares, _maxMythics),
+        MinOwnedFraction = _minOwnedPercent > 0 ? _minOwnedPercent / 100.0 : null,
         NameSearch = _search,
         ContainsCards = _containsCards,
         ExcludesCards = _excludesCards,
