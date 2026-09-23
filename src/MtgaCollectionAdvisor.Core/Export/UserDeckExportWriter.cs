@@ -14,17 +14,24 @@ public static class UserDeckExportWriter
 {
     private static readonly HashSet<char> Invalid = [.. Path.GetInvalidFileNameChars(), '<', '>', ':', '"', '/', '\\', '|', '?', '*'];
 
-    public static byte[] WriteZip(IReadOnlyList<CandidateDeck> decks)
+    public static byte[] WriteZip(IReadOnlyList<CandidateDeck> decks) =>
+        WriteZip(decks.Select(d => new ZipEntryFile(d.FormatKey, d.Name, ArenaDeckListWriter.Write(d))));
+
+    /// <summary>
+    /// Any set of deck files, one folder each - shared by the user-deck and Arena-deck
+    /// exports so both zips look the same.
+    /// </summary>
+    public static byte[] WriteZip(IEnumerable<ZipEntryFile> files)
     {
         using var buffer = new MemoryStream();
         using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
         {
             var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var deck in decks.OrderBy(d => d.FormatKey).ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase))
+            foreach (var file in files.OrderBy(f => f.Folder, StringComparer.Ordinal).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase))
             {
-                var entry = zip.CreateEntry(UniquePath(deck, used), CompressionLevel.Optimal);
+                var entry = zip.CreateEntry(UniquePath(file.Folder, file.Name, used), CompressionLevel.Optimal);
                 using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-                writer.Write(ArenaDeckListWriter.Write(deck));
+                writer.Write(file.Content);
             }
         }
         return buffer.ToArray();
@@ -41,10 +48,9 @@ public static class UserDeckExportWriter
         return cleaned.Length == 0 ? "deck" : cleaned;
     }
 
-    private static string UniquePath(CandidateDeck deck, HashSet<string> used)
+    private static string UniquePath(string folder, string name, HashSet<string> used)
     {
-        var folder = deck.FormatKey;
-        var baseName = SafeFileName(deck.Name);
+        var baseName = SafeFileName(name);
         var path = $"{folder}/{baseName}.txt";
         for (var n = 2; !used.Add(path); n++)
         {
@@ -53,3 +59,6 @@ public static class UserDeckExportWriter
         return path;
     }
 }
+
+/// <summary>One file in a deck zip: the folder it goes in, the deck's name, and its text.</summary>
+public sealed record ZipEntryFile(string Folder, string Name, string Content);

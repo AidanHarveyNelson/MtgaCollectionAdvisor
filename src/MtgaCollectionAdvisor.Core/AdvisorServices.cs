@@ -1,4 +1,5 @@
 using MtgaCollectionAdvisor.Core.Analysis;
+using MtgaCollectionAdvisor.Core.Arena;
 using MtgaCollectionAdvisor.Core.Cards;
 using MtgaCollectionAdvisor.Core.Configuration;
 using MtgaCollectionAdvisor.Core.Creators;
@@ -25,6 +26,7 @@ public sealed class AdvisorServices : IAsyncDisposable
     public CuratedDeckStore CuratedDeckStore { get; }
     public PinnedDeckStore PinnedDeckStore { get; }
     public CollectionBrowserQuery CollectionBrowserQuery { get; }
+    public ArenaDeckStore ArenaDeckStore { get; }
     public DataExportService DataExportService { get; }
     public DeckRankingService DeckRankingService { get; }
     public PlayerLogWatcher PlayerLogWatcher { get; }
@@ -48,7 +50,8 @@ public sealed class AdvisorServices : IAsyncDisposable
         CuratedDeckStore = new CuratedDeckStore(Database);
         PinnedDeckStore = new PinnedDeckStore(Database);
         CollectionBrowserQuery = new CollectionBrowserQuery(Database);
-        DataExportService = new DataExportService(CollectionStore, CardDatabaseStore, CuratedDeckStore);
+        ArenaDeckStore = new ArenaDeckStore(Database);
+        DataExportService = new DataExportService(CollectionStore, CardDatabaseStore, CuratedDeckStore, ArenaDeckStore);
         DeckRankingService = new DeckRankingService(new WildcardCalculator(CardDatabaseStore));
         PlayerLogWatcher = new PlayerLogWatcher(config.PlayerLogPathOverride);
 

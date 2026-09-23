@@ -1,4 +1,5 @@
 using MtgaCollectionAdvisor.Core;
+using MtgaCollectionAdvisor.Core.Arena;
 using MtgaCollectionAdvisor.Core.Configuration;
 using MtgaCollectionAdvisor.Core.Creators;
 using MtgaCollectionAdvisor.Core.Decks;
@@ -51,6 +52,8 @@ public sealed class AdvisorSession(AppConfig config) : IAsyncDisposable
 
         CardsUpdatedAt = await services.CardDatabaseStore.GetLastImportedAsync();
         services.PlayerLogWatcher.InventoryUpdated += OnWildcardsUpdated;
+        services.PlayerLogWatcher.ArenaDecksUpdated += OnArenaDecksUpdated;
+        ArenaDecksCapturedAt = (await services.ArenaDeckStore.LoadAsync())?.CapturedAt;
         services.PlayerLogWatcher.Start();
 
         await ReloadRankingAsync();
@@ -339,6 +342,23 @@ public sealed class AdvisorSession(AppConfig config) : IAsyncDisposable
         _mtgaWasRunning = running;
 
         if (justStarted && !IsBusy) await ScanCollectionAsync();
+    }
+
+    /// <summary>
+    /// When the app last read Arena's saved decks from Player.log - not when the player logged
+    /// in, which may have been hours before. Null if never.
+    /// </summary>
+    public DateTimeOffset? ArenaDecksCapturedAt { get; private set; }
+
+    private void OnArenaDecksUpdated(IReadOnlyList<ArenaDeck> decks)
+    {
+        _ = Task.Run(async () =>
+        {
+            var capturedAt = DateTimeOffset.UtcNow;
+            await services.ArenaDeckStore.ReplaceAsync(decks, capturedAt);
+            ArenaDecksCapturedAt = capturedAt;
+            Notify();
+        });
     }
 
     private void OnWildcardsUpdated(WildcardInventory inventory)

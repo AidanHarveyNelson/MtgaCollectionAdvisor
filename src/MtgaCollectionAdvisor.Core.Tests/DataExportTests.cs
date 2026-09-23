@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
+using MtgaCollectionAdvisor.Core.Arena;
 using MtgaCollectionAdvisor.Core.Cards;
 using MtgaCollectionAdvisor.Core.Decks;
 using MtgaCollectionAdvisor.Core.Export;
@@ -149,7 +150,7 @@ public sealed class DataExportTests : IAsyncLifetime
         await decks.AddDeckAsync(UserDeck("Also mine", Formats.Pioneer, ("Island", 20, DeckBoard.Main)));
         await decks.AddDeckAsync(UserDeck("Fetched", Formats.Standard, ("Forest", 20, DeckBoard.Main)) with { SourceId = "archidekt:1" });
 
-        var service = new DataExportService(new CollectionStore(_database), new CardDatabaseStore(_database), decks);
+        var service = new DataExportService(new CollectionStore(_database), new CardDatabaseStore(_database), decks, new ArenaDeckStore(_database));
         var file = await service.UserDecksAsync();
 
         Assert.Equal("application/zip", file.ContentType);

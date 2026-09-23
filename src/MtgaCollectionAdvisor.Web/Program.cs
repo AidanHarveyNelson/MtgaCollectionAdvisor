@@ -52,11 +52,13 @@ app.MapGet("/instance", () => InstanceMarker);
 // Downloads for the Export menu. Plain links with a download attribute, which Blazor
 // leaves to the browser rather than routing.
 app.MapGet("/export/collection.txt", (AdvisorSession session, CancellationToken ct) =>
-    Download(session, (export, token) => export.CollectionTextAsync(token), ct));
+    Download(session, async (export, token) => await export.CollectionTextAsync(token), ct));
 app.MapGet("/export/collection.json", (AdvisorSession session, CancellationToken ct) =>
-    Download(session, (export, token) => export.CollectionJsonAsync(token), ct));
+    Download(session, async (export, token) => await export.CollectionJsonAsync(token), ct));
 app.MapGet("/export/user-decks.zip", (AdvisorSession session, CancellationToken ct) =>
-    Download(session, (export, token) => export.UserDecksAsync(token), ct));
+    Download(session, async (export, token) => await export.UserDecksAsync(token), ct));
+app.MapGet("/export/arena-decks.zip", (AdvisorSession session, bool? all, CancellationToken ct) =>
+    Download(session, (export, token) => export.ArenaDecksAsync(all == true, token), ct));
 
 await app.Services.GetRequiredService<AdvisorSession>().InitializeAsync();
 
@@ -68,10 +70,10 @@ if (openWindow)
 app.Run();
 
 static async Task<IResult> Download(
-    AdvisorSession session, Func<DataExportService, CancellationToken, Task<ExportFile>> write, CancellationToken ct)
+    AdvisorSession session, Func<DataExportService, CancellationToken, Task<ExportFile?>> write, CancellationToken ct)
 {
     if (session.DataExport is not { } export) return Results.Problem("The app has not finished starting.");
-    var file = await write(export, ct);
+    if (await write(export, ct) is not { } file) return Results.Problem("Nothing to export yet.", statusCode: 404);
     return Results.File(file.Content, file.ContentType, file.FileName);
 }
 
