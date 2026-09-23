@@ -12,7 +12,7 @@ namespace MtgaCollectionAdvisor.Web.Services;
 /// deck fetch, card database import). Components subscribe to <see cref="Changed"/>
 /// and re-render; nothing in the UI ever blocks on a scan.
 /// </summary>
-public sealed class AdvisorSession(AppConfig config) : IDisposable
+public sealed class AdvisorSession(AppConfig config) : IAsyncDisposable
 {
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private System.Threading.Timer? _mtgaWatchTimer;
@@ -393,9 +393,15 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
         public void Report(string value) => report(value);
     }
 
-    public void Dispose()
+    /// <summary>
+    /// Runs when the app stops - including when its window has been gone for the grace
+    /// period (<see cref="StopWhenNoWindowService"/>) - so the MTG Arena watcher and the
+    /// Player.log poller end with it.
+    /// </summary>
+    public async ValueTask DisposeAsync()
     {
-        _mtgaWatchTimer?.Dispose();
+        if (_mtgaWatchTimer is not null) await _mtgaWatchTimer.DisposeAsync();
+        if (services is not null) await services.DisposeAsync();
         _operationGate.Dispose();
     }
 }

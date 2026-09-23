@@ -43,10 +43,13 @@ not in the server log. If nothing is clickable, check this first.
 The taskbar icon of the Chromium `--app` window comes from the page's favicon and web app
 manifest, not from the executable's embedded icon.
 
-**Closing the window does not stop the app.** The server keeps running without a window
-(the MTG Arena watcher and `Player.log` poller with it) until the process is killed. A
-leftover `MtgaCollectionAdvisor.Web.exe` holds port 5199 and locks `bin/` DLLs, so check
-`tasklist` before blaming a port conflict or a broken build.
+**Closing the window stops the app, 45 s later** (#34). `WindowPresence` counts window
+*connections*, not circuits: Blazor keeps a closed window's circuit for about 3 minutes in
+case it reconnects, so `OnCircuitClosedAsync` fires far too late. Nothing stops until a
+first window has connected, so a `--no-browser` run that nobody opens stays up. A second
+launch finds the running instance through `/instance` and opens a window on it. An
+instance from before #34, or one killed mid-shutdown, can still hold port 5199 and lock
+`bin/` DLLs, so check `tasklist` before blaming a port conflict or a broken build.
 
 **Verify with `dotnet run`, not by launching the `.exe` in `bin/`.** Run that way, outside
 a publish, the app is in Production and serves no `wwwroot`: every page arrives with no CSS,
