@@ -213,10 +213,12 @@
     /// <summary>
     /// Once per visit, as soon as the session is free. At startup the collection scan holds
     /// the session for a minute or two; loading only on first render left the page empty.
+    /// Every visit, not just the first: a fresh cache costs only a re-price, and a stale one
+    /// (or a creator whose feed failed last time) is exactly what a visit should fix.
     /// </summary>
     private void TryAutoLoad()
     {
-        if (_autoLoadStarted || !Session.CreatorVideosEnabled || Session.IsBusy || Session.CreatorVideos.Count > 0) return;
+        if (_autoLoadStarted || !Session.CreatorVideosEnabled || Session.IsBusy) return;
         _autoLoadStarted = true;
         _ = Session.LoadCreatorVideosAsync();
     }

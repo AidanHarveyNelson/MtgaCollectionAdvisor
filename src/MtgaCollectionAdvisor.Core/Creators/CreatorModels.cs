@@ -128,7 +128,24 @@ public sealed record CreatorVideoSnapshot(DateTimeOffset? RefreshedAt, IReadOnly
     /// <summary>How long the channel feeds are trusted before they are fetched again.</summary>
     public static readonly TimeSpan MaxAge = TimeSpan.FromHours(6);
 
+    /// <summary>How soon a channel with nothing cached - its feed failed - is tried again.</summary>
+    public static readonly TimeSpan RetryMissingAfter = TimeSpan.FromMinutes(15);
+
     public static CreatorVideoSnapshot Empty { get; } = new(null, []);
 
-    public bool IsStale(DateTimeOffset now) => RefreshedAt is not { } at || now - at >= MaxAge;
+    /// <summary>
+    /// Stale after <see cref="MaxAge"/>, or after only <see cref="RetryMissingAfter"/> while
+    /// a curated channel has no videos cached. YouTube's feeds fail at random; without the
+    /// shorter retry, a channel whose first fetch failed stayed missing for six hours.
+    /// </summary>
+    public bool IsStale(DateTimeOffset now, IReadOnlyCollection<CreatorChannel> curated)
+    {
+        if (RefreshedAt is not { } at) return true;
+
+        var age = now - at;
+        if (age >= MaxAge) return true;
+
+        var cachedCreators = Videos.Select(v => v.Creator).ToHashSet(StringComparer.Ordinal);
+        return age >= RetryMissingAfter && curated.Any(c => !cachedCreators.Contains(c.Name));
+    }
 }

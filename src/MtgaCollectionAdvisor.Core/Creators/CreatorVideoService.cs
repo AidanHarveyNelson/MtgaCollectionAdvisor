@@ -29,7 +29,7 @@ public sealed class CreatorVideoService(
     public async Task<CreatorVideoRefreshResult> LoadAsync(bool force, CancellationToken ct = default)
     {
         var cached = await store.LoadAsync(ct);
-        if (!force && !cached.IsStale(DateTimeOffset.UtcNow))
+        if (!force && !cached.IsStale(DateTimeOffset.UtcNow, CreatorChannels.All))
         {
             return new CreatorVideoRefreshResult(cached.Videos, FromCache: true, FailedFeeds: 0, ArchidektFetches: 0);
         }
