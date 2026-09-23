@@ -43,6 +43,15 @@ not in the server log. If nothing is clickable, check this first.
 The taskbar icon of the Chromium `--app` window comes from the page's favicon and web app
 manifest, not from the executable's embedded icon.
 
+**Closing the window does not stop the app.** The server keeps running without a window
+(the MTG Arena watcher and `Player.log` poller with it) until the process is killed. A
+leftover `MtgaCollectionAdvisor.Web.exe` holds port 5199 and locks `bin/` DLLs, so check
+`tasklist` before blaming a port conflict or a broken build.
+
+**Verify with `dotnet run`, not by launching the `.exe` in `bin/`.** Run that way, outside
+a publish, the app is in Production and serves no `wwwroot`: every page arrives with no CSS,
+and no error.
+
 ## Testing
 
 Put logic where it can be tested without a UI or a database. Deck-list filtering lives in
@@ -68,6 +77,15 @@ lookup with `EXPLAIN QUERY PLAN`. `SCAN` means it will not scale.
 **Deck sources send explicit nulls where a list is expected.** `System.Text.Json` writes
 those over property initializers, so `= []` on a DTO property does not protect you —
 coalesce at the point of use. Archidekt does this for `categories` on untagged cards.
+
+**AetherHub and Moxfield (and MTGGoldfish) refuse automated reads** behind Cloudflare. Do not
+try to get past it: open their links for the user and let them paste the export instead.
+Archidekt's API is the readable deck source.
+
+**YouTube's public channel feeds fail at random (404/500), and throttle a machine that asks
+too often** — during #32, bulk probing got every feed refused for hours, for the app too.
+Treat a failed feed as "no news", never "no videos", and keep to `CreatorFeedSchedule`. Do
+not bulk-probe feeds while testing.
 
 Deck sites let anyone file any list under any format, so fetched decks must be checked for
 format legality rather than trusted. Scryfall's bulk data lists a few `arena_id` values more
