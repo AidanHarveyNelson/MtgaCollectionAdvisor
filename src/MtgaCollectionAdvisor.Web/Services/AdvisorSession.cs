@@ -350,6 +350,72 @@ public sealed class AdvisorSession(AppConfig config) : IAsyncDisposable
     /// </summary>
     public DateTimeOffset? ArenaDecksCapturedAt { get; private set; }
 
+    /// <summary>The player's own Arena decks for the Import deck dialog, marked when already in the app.</summary>
+    public async Task<IReadOnlyList<ArenaDeckChoice>> GetArenaDeckChoicesAsync()
+    {
+        if (services is null || await services.ArenaDeckStore.LoadAsync() is not { } snapshot) return [];
+
+        var names = await services.CardDatabaseStore.GetNamesAsync();
+        return ArenaDeckImport.Choices(snapshot.Decks, names, await LoadUserDeckIdsAsync());
+    }
+
+    /// <summary>
+    /// Brings the picked Arena decks in as user decks. One already in the app is updated in
+    /// place, keeping its id and so its pin; the rest are added. Arena itself is never touched.
+    /// </summary>
+    public Task ImportArenaDecksAsync(IReadOnlyCollection<string> arenaDeckIds) =>
+        RunAsync("Importing Arena decks", async report =>
+        {
+            if (await services.ArenaDeckStore.LoadAsync() is not { } snapshot) return;
+
+            var names = await services.CardDatabaseStore.GetNamesAsync();
+            var inApp = await LoadUserDeckIdsAsync();
+            var now = DateTimeOffset.UtcNow;
+            int added = 0, updated = 0;
+            string? lastInCurrentFormat = null;
+
+            foreach (var arenaDeck in snapshot.Decks.Where(d => arenaDeckIds.Contains(d.Id) && !d.IsWizardsDeck))
+            {
+                if (ArenaDeckImport.ToCandidateDeck(arenaDeck, names, now) is not { } deck || deck.Cards.Count == 0) continue;
+
+                if (inApp.Contains(deck.SourceId))
+                {
+                    await services.CuratedDeckStore.UpdateUserDeckAsync(deck);
+                    updated++;
+                }
+                else
+                {
+                    await services.CuratedDeckStore.AddDeckAsync(deck);
+                    added++;
+                }
+
+                if (deck.FormatKey == Format.Key) lastInCurrentFormat = deck.SourceId;
+            }
+
+            LastImportedSourceId = lastInCurrentFormat;
+            await ReloadRankingAsync();
+
+            var parts = new List<string>();
+            if (added > 0) parts.Add($"{added} added");
+            if (updated > 0) parts.Add($"{updated} updated");
+            report(parts.Count == 0
+                ? "No Arena decks imported."
+                : $"Arena decks: {string.Join(", ", parts)}. Find them under User decks.");
+        });
+
+    private async Task<IReadOnlySet<string>> LoadUserDeckIdsAsync()
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var format in Formats.All)
+        {
+            foreach (var deck in await services.CuratedDeckStore.LoadAsync(format))
+            {
+                if (deck.IsUserDeck) ids.Add(deck.SourceId);
+            }
+        }
+        return ids;
+    }
+
     private void OnArenaDecksUpdated(IReadOnlyList<ArenaDeck> decks)
     {
         _ = Task.Run(async () =>
