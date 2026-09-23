@@ -15,6 +15,33 @@ public enum DeckSourceFilter
 }
 
 /// <summary>
+/// An optional per-rarity cap on a deck's wildcard cost. A null cap is "no limit"; a cap of
+/// zero is a real constraint ("no mythics needed"), which is why these are nullable ints
+/// rather than a plain count.
+///
+/// Rare and mythic wildcards are the scarce ones, so a single total is the wrong unit for
+/// the decision the user is actually making.
+/// </summary>
+public sealed record RarityBudget(int? Commons, int? Uncommons, int? Rares, int? Mythics)
+{
+    public static RarityBudget Unlimited { get; } = new(null, null, null, null);
+
+    public bool IsUnlimited =>
+        Commons is null && Uncommons is null && Rares is null && Mythics is null;
+
+    public bool Allows(WildcardNeed need) =>
+        Within(Commons, need.Commons)
+        && Within(Uncommons, need.Uncommons)
+        && Within(Rares, need.Rares)
+        && Within(Mythics, need.Mythics);
+
+    // A negative cap is nonsense the number input can still produce; treat it as zero
+    // rather than as "nothing qualifies", matching how MaxWildcards is already clamped.
+    private static bool Within(int? cap, int needed) =>
+        cap is not { } c || needed <= Math.Max(0, c);
+}
+
+/// <summary>
 /// Everything the deck list can be narrowed by. Lives here rather than in the UI so the
 /// rules can be tested without rendering a component or touching a database.
 /// </summary>
@@ -27,6 +54,16 @@ public sealed record DeckFilterCriteria
 
     public bool OnlyCraftable { get; init; }
     public int? MaxWildcards { get; init; }
+
+    /// <summary>Optional per-rarity caps on the wildcard cost, independent of MaxWildcards.</summary>
+    public RarityBudget RarityBudget { get; init; } = RarityBudget.Unlimited;
+
+    /// <summary>
+    /// Keep only decks at least this far complete, as a fraction of total copies (0.0-1.0).
+    /// Null is no threshold; the UI normalises "0%" to null so an untouched slider does not
+    /// read as an active filter.
+    /// </summary>
+    public double? MinOwnedFraction { get; init; }
     public string NameSearch { get; init; } = "";
 
     /// <summary>Every one of these cards must be in the deck.</summary>
@@ -60,6 +97,8 @@ public sealed record DeckFilterCriteria
         Colors.Count == 0
         && !OnlyCraftable
         && MaxWildcards is null
+        && RarityBudget.IsUnlimited
+        && MinOwnedFraction is null
         && string.IsNullOrWhiteSpace(NameSearch)
         && ContainsCards.Count == 0
         && ExcludesCards.Count == 0
@@ -105,6 +144,16 @@ public static class DeckFilter
         if (criteria.MaxWildcards is { } max)
         {
             query = query.Where(d => d.Needed.Total <= Math.Max(0, max));
+        }
+
+        if (!criteria.RarityBudget.IsUnlimited)
+        {
+            query = query.Where(d => criteria.RarityBudget.Allows(d.Needed));
+        }
+
+        if (criteria.MinOwnedFraction is { } minOwned)
+        {
+            query = query.Where(d => d.OwnedFraction >= Math.Clamp(minOwned, 0, 1));
         }
 
         if (!string.IsNullOrWhiteSpace(criteria.NameSearch))
