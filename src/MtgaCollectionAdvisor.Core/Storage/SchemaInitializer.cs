@@ -63,6 +63,22 @@ public static class SchemaInitializer
             PRIMARY KEY (source_id, card_name, board)
         );
 
+        -- The version of each deck a source listed that was read in detail, kept or not, so
+        -- a fetch only asks for what is new or changed (ArchidektDeckSync). kept = 0 marks a
+        -- deck that was read and rejected; it is not asked for again until it changes.
+        CREATE TABLE IF NOT EXISTS source_deck_versions (
+            source_id          TEXT PRIMARY KEY,
+            format_key         TEXT NOT NULL,
+            source_updated_at  TEXT NOT NULL,
+            kept               INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS deck_sync_state (
+            format_key    TEXT PRIMARY KEY,
+            last_sync_at  TEXT,
+            full_walk_at  TEXT
+        );
+
         -- Creator videos: what each video's description told us, so neither its feed nor
         -- Archidekt is asked again. The description itself is not kept.
         CREATE TABLE IF NOT EXISTS creator_videos (

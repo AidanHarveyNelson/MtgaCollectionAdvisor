@@ -52,6 +52,10 @@ leftover `MtgaCollectionAdvisor.Web.exe` holds port 5199 and locks `bin/` DLLs, 
 a publish, the app is in Production and serves no `wwwroot`: every page arrives with no CSS,
 and no error.
 
+**Report progress synchronously when a final status follows.** `Progress<T>` posts each
+report to run later, so the last "Reading deck 150…" can land after the summary line and
+overwrite it in the status bar. `AdvisorSession` has an `ImmediateProgress` for this.
+
 ## Testing
 
 Put logic where it can be tested without a UI or a database. Deck-list filtering lives in
@@ -81,6 +85,12 @@ coalesce at the point of use. Archidekt does this for `categories` on untagged c
 **AetherHub and Moxfield (and MTGGoldfish) refuse automated reads** behind Cloudflare. Do not
 try to get past it: open their links for the user and let them paste the export instead.
 Archidekt's API is the readable deck source.
+
+**Archidekt's search ignores `pageSize`** (always 60 per page) and stops at 1000 results.
+`orderBy=-viewCount` is all-time: its top pages are years-old, rotated decks and never
+change. The fetch walks `orderBy=-updatedAt` instead (#36). Standard gets roughly 150
+updated decks a *day*, so a walk reaches only a few days back, whatever window the code
+sets. Keep to `ArchidektSyncPlanner`'s limits; they are what keeps the app polite.
 
 **YouTube's public channel feeds fail at random (404/500), and throttle a machine that asks
 too often** — during #32, bulk probing got every feed refused for hours, for the app too.

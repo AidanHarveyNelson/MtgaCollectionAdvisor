@@ -30,6 +30,7 @@ public sealed class AdvisorServices : IAsyncDisposable
     public ScryfallBulkImporter ScryfallBulkImporter { get; }
     public HttpClient ArchidektHttpClient { get; }
     public ArchidektClient ArchidektClient { get; }
+    public ArchidektDeckSync ArchidektDeckSync { get; }
     public HttpClient YouTubeHttpClient { get; }
     public CreatorVideoStore CreatorVideoStore { get; }
     public CreatorVideoService CreatorVideoService { get; }
@@ -53,6 +54,7 @@ public sealed class AdvisorServices : IAsyncDisposable
 
         ArchidektHttpClient = ArchidektClient.CreateHttpClient();
         ArchidektClient = new ArchidektClient(ArchidektHttpClient);
+        ArchidektDeckSync = new ArchidektDeckSync(ArchidektClient, CuratedDeckStore, PinnedDeckStore);
 
         YouTubeHttpClient = YouTubeFeedClient.CreateHttpClient();
         CreatorVideoStore = new CreatorVideoStore(Database);

@@ -33,8 +33,13 @@ public sealed class ArchidektClient(HttpClient httpClient)
         return client;
     }
 
-    public async Task<IReadOnlyList<CandidateDeck>> FetchTopDecksAsync(
-        FormatDefinition format, int count, CancellationToken ct = default)
+    /// <summary>
+    /// One page of public decks in a format, most recently updated first. Archidekt ignores
+    /// <c>pageSize</c> and always sends 60 per page, and stops listing after 1000 results.
+    /// Sorting by views instead would return the same all-time top decks on every fetch,
+    /// most of them long rotated out of the format.
+    /// </summary>
+    public async Task<ArchidektSearchPage> SearchRecentAsync(FormatDefinition format, int page, CancellationToken ct = default)
     {
         if (!FormatIds.TryGetValue(format.Key, out var formatId))
         {
@@ -45,97 +50,109 @@ public sealed class ArchidektClient(HttpClient httpClient)
         try
         {
             search = await httpClient.GetFromJsonAsync<ArchidektSearchResponse>(
-                $"api/decks/v3/?deckFormat={formatId}&pageSize={count}&orderBy=-viewCount", JsonOptions, ct);
+                $"api/decks/v3/?deckFormat={formatId}&orderBy=-updatedAt&page={page}", JsonOptions, ct);
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
         {
             throw new ArchidektUnavailableException(
-                $"Could not fetch {format.DisplayName} decks from Archidekt.", ex);
+                $"Could not search {format.DisplayName} decks on Archidekt.", ex);
         }
 
-        var candidates = (search?.Results ?? []).Where(r => !r.Private && !r.Unlisted).ToList();
-        if (candidates.Count == 0)
+        var listings = (search?.Results ?? [])
+            .Where(r => !r.Private && !r.Unlisted)
+            .Select(r => new ArchidektListing(r.Id, r.Name, r.ViewCount, r.UpdatedAt))
+            .ToList();
+
+        return new ArchidektSearchPage(listings, HasNext: search?.Next is not null);
+    }
+
+    /// <summary>
+    /// A listed deck in detail. Null when it is not a real constructed deck (under 60
+    /// mainboard cards); throws <see cref="ArchidektUnavailableException"/> when Archidekt
+    /// did not answer, so the caller can stop asking rather than carry on regardless.
+    /// </summary>
+    public async Task<CandidateDeck?> ReadDeckAsync(
+        ArchidektListing listing, FormatDefinition format, DateTimeOffset fetchedAt, CancellationToken ct = default)
+    {
+        try
         {
-            throw new ArchidektUnavailableException($"Archidekt returned no public {format.DisplayName} decks.");
+            return await ReadDeckDetailAsync(listing.Id, listing.Name, listing.ViewCount, format, fetchedAt, ct);
         }
-
-        var fetchedAt = DateTimeOffset.UtcNow;
-        var decks = new List<CandidateDeck>(candidates.Count);
-
-        foreach (var summary in candidates)
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
         {
-            var deck = await TryFetchDeckDetailAsync(summary, format, fetchedAt, ct);
-            if (deck is not null) decks.Add(deck);
+            throw new ArchidektUnavailableException($"Could not read deck {listing.Id} from Archidekt.", ex);
         }
-
-        if (decks.Count == 0)
-        {
-            throw new ArchidektUnavailableException(
-                $"Archidekt listed {format.DisplayName} decks, but none could be read in detail.");
-        }
-
-        return decks;
     }
 
     /// <summary>
     /// One deck by id, e.g. linked from a creator video. Null when it cannot be read or is
     /// not a real constructed deck (under 60 cards), the same rules as a fetched deck.
     /// </summary>
-    public Task<CandidateDeck?> TryFetchDeckAsync(int id, FormatDefinition format, CancellationToken ct = default) =>
-        TryFetchDeckDetailAsync(new ArchidektDeckSummary { Id = id }, format, DateTimeOffset.UtcNow, ct);
-
-    private async Task<CandidateDeck?> TryFetchDeckDetailAsync(
-        ArchidektDeckSummary summary, FormatDefinition format, DateTimeOffset fetchedAt, CancellationToken ct)
+    public async Task<CandidateDeck?> TryFetchDeckAsync(int id, FormatDefinition format, CancellationToken ct = default)
     {
         try
         {
-            var detail = await httpClient.GetFromJsonAsync<ArchidektDeckDetail>(
-                $"api/decks/{summary.Id}/", JsonOptions, ct);
-            if (detail is null) return null;
-
-            var cards = new List<DeckCardRef>();
-            foreach (var entry in detail.Cards ?? [])
-            {
-                var name = entry.Card?.OracleCard?.Name;
-                if (string.IsNullOrWhiteSpace(name) || entry.Quantity <= 0) continue;
-
-                // Archidekt sends "categories": null (not []) for untagged cards, which
-                // System.Text.Json writes over the property initializer.
-                var categories = entry.Categories ?? [];
-
-                if (categories.Any(c => c.Equals("Maybeboard", StringComparison.OrdinalIgnoreCase)))
-                    continue;
-
-                var board = categories.Any(c => c.Equals("Sideboard", StringComparison.OrdinalIgnoreCase))
-                    ? DeckBoard.Sideboard
-                    : DeckBoard.Main;
-
-                cards.Add(new DeckCardRef(name, entry.Quantity, board));
-            }
-
-            // Anyone can save a 5-card scratch deck as "Standard"; a real constructed
-            // deck has at least a legal 60-card mainboard.
-            const int minimumMainboardSize = 60;
-            if (cards.Where(c => c.Board == DeckBoard.Main).Sum(c => c.Quantity) < minimumMainboardSize)
-            {
-                return null;
-            }
-
-            return new CandidateDeck(
-                SourceId: $"{SourcePrefix}{summary.Id}",
-                Name: string.IsNullOrWhiteSpace(detail.Name) ? summary.Name : detail.Name,
-                Url: $"https://archidekt.com/decks/{summary.Id}",
-                FormatKey: format.Key,
-                Popularity: summary.ViewCount,
-                Cards: cards,
-                FetchedAt: fetchedAt);
+            return await ReadDeckDetailAsync(id, "", 0, format, DateTimeOffset.UtcNow, ct);
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException)
         {
             return null;
         }
     }
+
+    private async Task<CandidateDeck?> ReadDeckDetailAsync(
+        int id, string listedName, int viewCount, FormatDefinition format, DateTimeOffset fetchedAt, CancellationToken ct)
+    {
+        var detail = await httpClient.GetFromJsonAsync<ArchidektDeckDetail>(
+            $"api/decks/{id}/", JsonOptions, ct);
+        if (detail is null) return null;
+
+        var cards = new List<DeckCardRef>();
+        foreach (var entry in detail.Cards ?? [])
+        {
+            var name = entry.Card?.OracleCard?.Name;
+            if (string.IsNullOrWhiteSpace(name) || entry.Quantity <= 0) continue;
+
+            // Archidekt sends "categories": null (not []) for untagged cards, which
+            // System.Text.Json writes over the property initializer.
+            var categories = entry.Categories ?? [];
+
+            if (categories.Any(c => c.Equals("Maybeboard", StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            var board = categories.Any(c => c.Equals("Sideboard", StringComparison.OrdinalIgnoreCase))
+                ? DeckBoard.Sideboard
+                : DeckBoard.Main;
+
+            cards.Add(new DeckCardRef(name, entry.Quantity, board));
+        }
+
+        // Anyone can save a 5-card scratch deck as "Standard"; a real constructed
+        // deck has at least a legal 60-card mainboard.
+        const int minimumMainboardSize = 60;
+        if (cards.Where(c => c.Board == DeckBoard.Main).Sum(c => c.Quantity) < minimumMainboardSize)
+        {
+            return null;
+        }
+
+        return new CandidateDeck(
+            SourceId: $"{SourcePrefix}{id}",
+            Name: string.IsNullOrWhiteSpace(detail.Name) ? listedName : detail.Name,
+            Url: $"https://archidekt.com/decks/{id}",
+            FormatKey: format.Key,
+            Popularity: viewCount,
+            Cards: cards,
+            FetchedAt: fetchedAt);
+    }
 }
+
+/// <summary>A deck as Archidekt's search lists it, before its cards are read.</summary>
+public sealed record ArchidektListing(int Id, string Name, int ViewCount, DateTimeOffset UpdatedAt)
+{
+    public string SourceId => $"{ArchidektClient.SourcePrefix}{Id}";
+}
+
+public sealed record ArchidektSearchPage(IReadOnlyList<ArchidektListing> Decks, bool HasNext);
 
 public sealed class ArchidektUnavailableException : Exception
 {

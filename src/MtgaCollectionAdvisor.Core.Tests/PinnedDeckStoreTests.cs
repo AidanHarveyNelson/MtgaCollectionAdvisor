@@ -30,45 +30,57 @@ public sealed class PinnedDeckStoreTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PinnedDeck_Should_SurviveAutoFetchRefresh()
+    public async Task PinnedDeck_Should_SurvivePrune_When_ItLeavesTheWindow()
     {
-        await _decks.ReplaceAutoFetchedAsync(Formats.Standard, Prefix, [Deck("archidekt:1", "Tracked")]);
+        await _decks.MergeFetchedAsync(Formats.Standard, [Fetched("archidekt:1", "Tracked", daysAgo: 100)]);
         await _pins.PinAsync("archidekt:1", Formats.Standard.Key, wildcardsNow: 14);
 
-        // The source no longer lists it - the deck must not disappear mid-progress.
-        await _decks.ReplaceAutoFetchedAsync(Formats.Standard, Prefix, [Deck("archidekt:2", "Something else")]);
+        // The source no longer lists it as recent - the deck must not disappear mid-progress.
+        await _decks.PruneFetchedAsync(Formats.Standard, Prefix, Now.AddDays(-90));
 
-        var stored = await _decks.LoadAsync(Formats.Standard);
-        Assert.Contains(stored, d => d.SourceId == "archidekt:1");
-        Assert.Contains(stored, d => d.SourceId == "archidekt:2");
-
+        Assert.Contains(await _decks.LoadAsync(Formats.Standard), d => d.SourceId == "archidekt:1");
         var pins = await _pins.LoadAsync();
         Assert.Equal(14, pins["archidekt:1"].WildcardsWhenPinned);
     }
 
     [Fact]
-    public async Task RefreshedPinnedDeck_Should_GetUpdatedCards()
+    public async Task PinnedDeck_Should_StayFrozen_When_TheSourceChangesIt()
     {
-        await _decks.ReplaceAutoFetchedAsync(Formats.Standard, Prefix, [Deck("archidekt:1", "Tracked", "Mountain")]);
+        await _decks.MergeFetchedAsync(Formats.Standard, [Fetched("archidekt:1", "Tracked", daysAgo: 5, card: "Mountain")]);
         await _pins.PinAsync("archidekt:1", Formats.Standard.Key, wildcardsNow: 9);
 
-        await _decks.ReplaceAutoFetchedAsync(Formats.Standard, Prefix, [Deck("archidekt:1", "Tracked", "Island")]);
+        var result = await _decks.MergeFetchedAsync(Formats.Standard, [Fetched("archidekt:1", "Tracked", daysAgo: 1, card: "Island")]);
 
+        Assert.Equal(new DeckMergeResult(0, 0), result);
         var deck = Assert.Single(await _decks.LoadAsync(Formats.Standard));
-        Assert.Contains(deck.Cards, c => c.Name == "Island");
-        Assert.DoesNotContain(deck.Cards, c => c.Name == "Mountain");
+        Assert.Contains(deck.Cards, c => c.Name == "Mountain");
+        Assert.DoesNotContain(deck.Cards, c => c.Name == "Island");
     }
 
     [Fact]
-    public async Task UnpinnedDecks_Should_StillBeReplacedByRefresh()
+    public async Task PinnedDeck_Should_NotBeRemoved_When_ASourceRejectsIt()
     {
-        await _decks.ReplaceAutoFetchedAsync(Formats.Standard, Prefix, [Deck("archidekt:1", "Disposable")]);
+        await _decks.MergeFetchedAsync(Formats.Standard, [Fetched("archidekt:1", "Tracked", daysAgo: 5)]);
+        await _pins.PinAsync("archidekt:1", Formats.Standard.Key, wildcardsNow: 9);
 
-        await _decks.ReplaceAutoFetchedAsync(Formats.Standard, Prefix, [Deck("archidekt:2", "Fresh")]);
+        await _decks.MergeFetchedAsync(Formats.Standard, [new FetchedDeck("archidekt:1", Now, Deck: null)]);
+        await _decks.RemoveFetchedAsync(["archidekt:1"]);
 
-        var stored = await _decks.LoadAsync(Formats.Standard);
-        Assert.Single(stored);
-        Assert.Equal("archidekt:2", stored[0].SourceId);
+        Assert.Single(await _decks.LoadAsync(Formats.Standard));
+    }
+
+    [Fact]
+    public async Task UnpinnedDecks_Should_BePruned_When_TheyLeaveTheWindow()
+    {
+        await _decks.MergeFetchedAsync(Formats.Standard, [
+            Fetched("archidekt:1", "Stale", daysAgo: 100),
+            Fetched("archidekt:2", "Fresh", daysAgo: 3),
+        ]);
+
+        await _decks.PruneFetchedAsync(Formats.Standard, Prefix, Now.AddDays(-90));
+
+        var stored = Assert.Single(await _decks.LoadAsync(Formats.Standard));
+        Assert.Equal("archidekt:2", stored.SourceId);
     }
 
     [Fact]
@@ -103,12 +115,17 @@ public sealed class PinnedDeckStoreTests : IAsyncLifetime
         Assert.Equal(Formats.Pioneer.Key, pins["manual:abc"].FormatKey);
     }
 
-    private static CandidateDeck Deck(string sourceId, string name, string card = "Mountain") => new(
-        SourceId: sourceId,
-        Name: name,
-        Url: "",
-        FormatKey: Formats.Standard.Key,
-        Popularity: 0,
-        Cards: [new DeckCardRef(card, 4, DeckBoard.Main)],
-        FetchedAt: DateTimeOffset.UtcNow);
+    private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
+
+    private static FetchedDeck Fetched(string sourceId, string name, int daysAgo, string card = "Mountain") => new(
+        sourceId,
+        Now.AddDays(-daysAgo),
+        new CandidateDeck(
+            SourceId: sourceId,
+            Name: name,
+            Url: "",
+            FormatKey: Formats.Standard.Key,
+            Popularity: 0,
+            Cards: [new DeckCardRef(card, 4, DeckBoard.Main)],
+            FetchedAt: Now));
 }

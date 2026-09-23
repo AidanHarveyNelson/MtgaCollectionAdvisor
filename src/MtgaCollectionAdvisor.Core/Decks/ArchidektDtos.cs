@@ -7,6 +7,7 @@ namespace MtgaCollectionAdvisor.Core.Decks;
 internal sealed class ArchidektSearchResponse
 {
     [JsonPropertyName("results")] public List<ArchidektDeckSummary>? Results { get; set; }
+    [JsonPropertyName("next")] public string? Next { get; set; }
 }
 
 internal sealed class ArchidektDeckSummary
@@ -16,6 +17,7 @@ internal sealed class ArchidektDeckSummary
     [JsonPropertyName("viewCount")] public int ViewCount { get; set; }
     [JsonPropertyName("private")] public bool Private { get; set; }
     [JsonPropertyName("unlisted")] public bool Unlisted { get; set; }
+    [JsonPropertyName("updatedAt")] public DateTimeOffset UpdatedAt { get; set; }
 }
 
 internal sealed class ArchidektDeckDetail
