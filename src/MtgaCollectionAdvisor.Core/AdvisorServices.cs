@@ -3,6 +3,7 @@ using MtgaCollectionAdvisor.Core.Cards;
 using MtgaCollectionAdvisor.Core.Configuration;
 using MtgaCollectionAdvisor.Core.Creators;
 using MtgaCollectionAdvisor.Core.Decks;
+using MtgaCollectionAdvisor.Core.Export;
 using MtgaCollectionAdvisor.Core.Logs;
 using MtgaCollectionAdvisor.Core.Memory;
 using MtgaCollectionAdvisor.Core.Storage;
@@ -24,6 +25,7 @@ public sealed class AdvisorServices : IAsyncDisposable
     public CuratedDeckStore CuratedDeckStore { get; }
     public PinnedDeckStore PinnedDeckStore { get; }
     public CollectionBrowserQuery CollectionBrowserQuery { get; }
+    public DataExportService DataExportService { get; }
     public DeckRankingService DeckRankingService { get; }
     public PlayerLogWatcher PlayerLogWatcher { get; }
     public HttpClient ScryfallHttpClient { get; }
@@ -46,6 +48,7 @@ public sealed class AdvisorServices : IAsyncDisposable
         CuratedDeckStore = new CuratedDeckStore(Database);
         PinnedDeckStore = new PinnedDeckStore(Database);
         CollectionBrowserQuery = new CollectionBrowserQuery(Database);
+        DataExportService = new DataExportService(CollectionStore, CardDatabaseStore, CuratedDeckStore);
         DeckRankingService = new DeckRankingService(new WildcardCalculator(CardDatabaseStore));
         PlayerLogWatcher = new PlayerLogWatcher(config.PlayerLogPathOverride);
 

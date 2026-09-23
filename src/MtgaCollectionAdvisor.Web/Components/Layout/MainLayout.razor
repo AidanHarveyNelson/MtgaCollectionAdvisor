@@ -56,6 +56,33 @@
                     @onclick="() => Session.RefreshCardDatabaseAsync()">
                 Update cards
             </button>
+
+            @* Plain download links: the files are written by the /export endpoints, and
+               Blazor leaves an anchor with a download attribute to the browser. *@
+            <div class="export-menu">
+                <button aria-haspopup="true" aria-expanded="@(_showExport ? "true" : "false")"
+                        title="Take your data with you: the collection and your own decks, as files."
+                        @onclick="() => _showExport = !_showExport">
+                    Export ▾
+                </button>
+                @if (_showExport)
+                {
+                    var hasCollection = Session.Collection.OwnedByGrpId.Count > 0;
+                    <div class="export-options" role="menu">
+                        <a role="menuitem" href="export/collection.txt" download
+                           class="@(hasCollection ? "" : "disabled")" @onclick="() => _showExport = false">
+                            Collection <span>Arena list (.txt)</span>
+                        </a>
+                        <a role="menuitem" href="export/collection.json" download
+                           class="@(hasCollection ? "" : "disabled")" @onclick="() => _showExport = false">
+                            Collection <span>with wildcards (.json)</span>
+                        </a>
+                        <a role="menuitem" href="export/user-decks.zip" download @onclick="() => _showExport = false">
+                            All user decks <span>one file per deck (.zip)</span>
+                        </a>
+                    </div>
+                }
+            </div>
         </div>
     </header>
 
@@ -92,6 +119,7 @@
 
 @code {
     private bool _showImportDeck;
+    private bool _showExport;
 
     protected override void OnInitialized() => Session.Changed += OnSessionChanged;
 

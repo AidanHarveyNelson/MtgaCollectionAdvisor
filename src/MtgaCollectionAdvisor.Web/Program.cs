@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using MtgaCollectionAdvisor.Core;
 using MtgaCollectionAdvisor.Core.Configuration;
+using MtgaCollectionAdvisor.Core.Export;
 using MtgaCollectionAdvisor.Core.Hosting;
 using MtgaCollectionAdvisor.Web.Components;
 using MtgaCollectionAdvisor.Web.Services;
@@ -48,6 +49,15 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.MapGet("/instance", () => InstanceMarker);
 
+// Downloads for the Export menu. Plain links with a download attribute, which Blazor
+// leaves to the browser rather than routing.
+app.MapGet("/export/collection.txt", (AdvisorSession session, CancellationToken ct) =>
+    Download(session, (export, token) => export.CollectionTextAsync(token), ct));
+app.MapGet("/export/collection.json", (AdvisorSession session, CancellationToken ct) =>
+    Download(session, (export, token) => export.CollectionJsonAsync(token), ct));
+app.MapGet("/export/user-decks.zip", (AdvisorSession session, CancellationToken ct) =>
+    Download(session, (export, token) => export.UserDecksAsync(token), ct));
+
 await app.Services.GetRequiredService<AdvisorSession>().InitializeAsync();
 
 if (openWindow)
@@ -56,6 +66,14 @@ if (openWindow)
 }
 
 app.Run();
+
+static async Task<IResult> Download(
+    AdvisorSession session, Func<DataExportService, CancellationToken, Task<ExportFile>> write, CancellationToken ct)
+{
+    if (session.DataExport is not { } export) return Results.Problem("The app has not finished starting.");
+    var file = await write(export, ct);
+    return Results.File(file.Content, file.ContentType, file.FileName);
+}
 
 // Asks the port whether this app is already on it. Anything else there - or nothing -
 // is left for the bind to report as usual.

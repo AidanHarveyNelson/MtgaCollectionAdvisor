@@ -79,6 +79,22 @@ public sealed class CardDatabaseStore(Database database)
         return result is string text && DateTimeOffset.TryParse(text, out var value) ? value : null;
     }
 
+    /// <summary>The name of every Arena id we know about - used to write the collection out.</summary>
+    public async Task<IReadOnlyDictionary<int, string>> GetNamesAsync(CancellationToken ct = default)
+    {
+        await using var connection = await database.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT grp_id, name FROM cards";
+        await using var reader = await command.ExecuteReaderAsync(ct);
+
+        var names = new Dictionary<int, string>();
+        while (await reader.ReadAsync(ct))
+        {
+            names[reader.GetInt32(0)] = reader.GetString(1);
+        }
+        return names;
+    }
+
     /// <summary>Every Arena id we know about - used to score memory-scan candidate blocks.</summary>
     public async Task<IReadOnlySet<int>> GetAllGrpIdsAsync(CancellationToken ct = default)
     {
