@@ -77,6 +77,13 @@ public sealed class ArchidektClient(HttpClient httpClient)
         return decks;
     }
 
+    /// <summary>
+    /// One deck by id, e.g. linked from a creator video. Null when it cannot be read or is
+    /// not a real constructed deck (under 60 cards), the same rules as a fetched deck.
+    /// </summary>
+    public Task<CandidateDeck?> TryFetchDeckAsync(int id, FormatDefinition format, CancellationToken ct = default) =>
+        TryFetchDeckDetailAsync(new ArchidektDeckSummary { Id = id }, format, DateTimeOffset.UtcNow, ct);
+
     private async Task<CandidateDeck?> TryFetchDeckDetailAsync(
         ArchidektDeckSummary summary, FormatDefinition format, DateTimeOffset fetchedAt, CancellationToken ct)
     {

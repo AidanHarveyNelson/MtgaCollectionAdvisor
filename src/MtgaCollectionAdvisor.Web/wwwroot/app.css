@@ -740,3 +740,61 @@ input[type="range"] { accent-color: var(--accent); }
 }
 
 .blazor-error-boundary::after { content: "Ocorreu um erro."; }
+
+/* ---------- Creators tab ---------- */
+
+.topnav { display: flex; gap: var(--space-1); margin-left: var(--space-4); }
+.topnav a { color: var(--text-muted); text-decoration: none; padding: 5px 10px; border-radius: var(--radius-sm); font-weight: 600; }
+.topnav a:hover { color: var(--text); background: var(--surface-hover); }
+.topnav a.active { color: var(--accent); background: var(--accent-soft); }
+
+.creators-page { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
+.creators-toolbar {
+    padding: var(--space-3) var(--space-4);
+    display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between;
+}
+.creators-heading { display: flex; align-items: baseline; gap: var(--space-3); }
+.creators-heading h2 { font-size: 16px; }
+.creators-filters { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.creators-filters select { width: auto; }
+
+.video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-4); }
+.video-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; display: flex; flex-direction: column;
+}
+.video-card:hover { border-color: var(--border-strong); }
+.video-thumb { position: relative; display: block; aspect-ratio: 16 / 9; background: #000; }
+.video-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.video-thumb .play {
+    position: absolute; inset: 0; margin: auto; width: 46px; height: 46px; border-radius: 50%;
+    display: grid; place-items: center; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 18px;
+    opacity: 0; transition: opacity 0.15s;
+}
+.video-thumb:hover .play { opacity: 1; }
+.video-body { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); flex: 1; }
+.video-title {
+    font-weight: 600; line-height: 1.3; min-height: 2.6em; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.video-deck { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.video-deck.muted { color: var(--text-faint); font-size: 12px; }
+.video-format { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.format-chip { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.format-chip.off { background: var(--surface-raised); color: var(--text-faint); }
+
+/* Pinned to the bottom of every card, Watch first, so it never moves between card kinds. */
+.video-actions { display: flex; gap: var(--space-2); margin-top: auto; padding-top: var(--space-2); }
+.video-actions a { text-decoration: none; }
+.video-actions button { white-space: nowrap; }
+
+/* Language: a small two-way switch next to the heading (flag = English only, globe = all). */
+.lang-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.lang-toggle button {
+    display: inline-flex; align-items: center; justify-content: center; padding: 4px 8px;
+    border: 0; border-radius: 0; background: transparent; color: var(--text-faint); opacity: 0.55;
+}
+.lang-toggle button + button { border-left: 1px solid var(--border); }
+.lang-toggle button:hover:not(:disabled) { background: var(--surface-hover); opacity: 0.85; }
+.lang-toggle button.active { background: var(--accent-soft); color: var(--accent); opacity: 1; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

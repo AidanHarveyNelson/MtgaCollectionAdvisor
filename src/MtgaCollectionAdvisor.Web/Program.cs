@@ -11,7 +11,12 @@ builder.WebHost.UseUrls("http://localhost:5199");
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddSingleton(AppConfig.Default);
+// Features:CreatorVideos in appsettings.json (or Features__CreatorVideos in the
+// environment). Absent means off, so a release never gains the tab by accident.
+builder.Services.AddSingleton(AppConfig.Default with
+{
+    CreatorVideosEnabled = builder.Configuration.GetValue("Features:CreatorVideos", false)
+});
 builder.Services.AddSingleton<AdvisorSession>();
 
 var app = builder.Build();

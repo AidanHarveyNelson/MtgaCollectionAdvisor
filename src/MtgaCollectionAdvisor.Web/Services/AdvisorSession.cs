@@ -1,5 +1,6 @@
 using MtgaCollectionAdvisor.Core;
 using MtgaCollectionAdvisor.Core.Configuration;
+using MtgaCollectionAdvisor.Core.Creators;
 using MtgaCollectionAdvisor.Core.Decks;
 using MtgaCollectionAdvisor.Core.Memory;
 using MtgaCollectionAdvisor.Core.Models;
@@ -186,8 +187,51 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
         }
     }
 
-    /// <summary>Adds a deck pasted by hand (Arena export format) to the candidate pool.</summary>
-    public Task ImportDeckAsync(string name, FormatDefinition format, string decklist) =>
+    // ---------- Creator videos (feature-flagged) ----------
+
+    public bool CreatorVideosEnabled => config.CreatorVideosEnabled;
+
+    public IReadOnlyList<CreatorVideoCard> CreatorVideos { get; private set; } = [];
+
+    /// <summary>What the cache knows, kept so a collection change can re-price without the network.</summary>
+    private IReadOnlyList<CreatorVideo> _creatorVideoSources = [];
+
+    /// <summary>
+    /// Loads creator videos - from the cache while it is fresh, from the feeds otherwise or
+    /// when <paramref name="force"/> is set - and prices them against the collection. Does
+    /// nothing at all when the feature is off: no feed is ever fetched.
+    /// </summary>
+    public Task LoadCreatorVideosAsync(bool force = false)
+    {
+        if (!CreatorVideosEnabled) return Task.CompletedTask;
+
+        return RunAsync("Loading creator videos", async report =>
+        {
+            var loaded = await services.CreatorVideoService.LoadAsync(force);
+            _creatorVideoSources = loaded.Videos;
+            CreatorVideos = await services.CreatorVideoService.PriceAsync(loaded.Videos, Collection);
+
+            var withDeck = CreatorVideos.Count(c => c.Analysis is not null);
+            var unavailable = loaded.FailedFeeds > 0
+                ? $" ({loaded.FailedFeeds} creator feed{(loaded.FailedFeeds == 1 ? "" : "s")} unavailable, showing what was cached)"
+                : "";
+            report($"{CreatorVideos.Count} creator videos, {withDeck} with a deck priced against your collection.{unavailable}");
+        });
+    }
+
+    /// <summary>Costs follow the collection; what a video's deck is does not, so no fetch here.</summary>
+    private async Task RepriceCreatorVideosAsync()
+    {
+        if (!CreatorVideosEnabled || _creatorVideoSources.Count == 0) return;
+        CreatorVideos = await services.CreatorVideoService.PriceAsync(_creatorVideoSources, Collection);
+    }
+
+    /// <summary>
+    /// Adds a deck pasted by hand (Arena export format) to the candidate pool.
+    /// <paramref name="sourceUrl"/> is where it came from - a creator video, when imported
+    /// from the Creators tab - and becomes the deck's source link.
+    /// </summary>
+    public Task ImportDeckAsync(string name, FormatDefinition format, string decklist, string sourceUrl = "") =>
         RunAsync("Importing deck", async report =>
         {
             var cards = ArenaDeckListParser.Parse(decklist);
@@ -200,7 +244,7 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
             var deck = new CandidateDeck(
                 SourceId: $"{CandidateDeck.ManualSourcePrefix}{Guid.NewGuid()}",
                 Name: name,
-                Url: "",
+                Url: sourceUrl,
                 FormatKey: format.Key,
                 Popularity: 0,
                 Cards: cards,
@@ -271,6 +315,7 @@ public sealed class AdvisorSession(AppConfig config) : IDisposable
     private async Task ReloadRankingAsync()
     {
         Collection = await services.CollectionStore.LoadAsync();
+        await RepriceCreatorVideosAsync();
         Pins = await services.PinnedDeckStore.LoadAsync();
         var stored = await services.CuratedDeckStore.LoadAsync(Format);
 
