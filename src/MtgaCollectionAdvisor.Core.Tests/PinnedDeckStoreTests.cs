@@ -17,7 +17,7 @@ public sealed class PinnedDeckStoreTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var database = new Database(_databasePath);
-        await SchemaInitializer.EnsureCreatedAsync(database);
+        await SchemaMigrator.MigrateAsync(database);
         _pins = new PinnedDeckStore(database);
         _decks = new CuratedDeckStore(database);
     }

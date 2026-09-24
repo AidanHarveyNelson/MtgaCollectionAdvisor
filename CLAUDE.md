@@ -90,6 +90,23 @@ Tests that genuinely need storage create a throwaway SQLite file and delete it i
 (see `CardNameSearchTests`), calling `SqliteConnection.ClearAllPools()` first or the file
 stays locked on Windows.
 
+## Database schema
+
+**The schema is versioned: `PRAGMA user_version` is the last migration a database has run**
+(#47). `SchemaMigrator` runs `Storage/Migrations.cs` at startup, backs the file up first
+(`advisor.db.backup-v{N}`, three kept), commits each migration whole, and refuses a
+database newer than the build without touching it. To change the schema, **add a migration
+at the end, never edit one**: users' databases have already run it, and a test pins each
+migration's hash. Editing `CREATE TABLE IF NOT EXISTS` in place does nothing to an
+existing database, which is why this exists.
+
+When a version is released, add `Core.Tests/Fixtures/schema-v{N}.sql` (that version's
+schema plus a row of each kind of user data) and list it in the fresh-versus-upgraded test.
+
+`decks` and `deck_cards` are **not** cache: they hold the user's own decks (`manual:` ids)
+next to fetched ones (`archidekt:`). A migration may rebuild the cache tables (`cards`,
+fetched decks' sync state, creator videos) but must carry user rows across.
+
 ## External data
 
 **Escape `LIKE` wildcards when the search term comes from the user.** An unescaped `%`
