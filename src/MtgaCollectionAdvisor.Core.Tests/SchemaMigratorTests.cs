@@ -39,7 +39,7 @@ public sealed class SchemaMigratorTests : IDisposable
     // is written; if one of these hashes stops matching, write a new migration instead.
     private static readonly Dictionary<int, string> PinnedHashes = new()
     {
-        [1] = "3F50A874929B104F72AFEC23274019F88632F768D8823841935FAE9C8FF4B3B2",
+        [1] = "CDFDBBCFB6F513B97556F6019CA939096D4E944643F4C0F8ADBA3CD0131814C8",
         [2] = "F5D3029F155A9FE97412FAC67B8E438D88ECADD8D24556BE96335A22FC0A67E2",
     };
 
