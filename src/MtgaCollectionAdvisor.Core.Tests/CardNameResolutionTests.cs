@@ -21,7 +21,7 @@ public sealed class CardNameResolutionTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var database = new Database(_databasePath);
-        await SchemaInitializer.EnsureCreatedAsync(database);
+        await SchemaMigrator.MigrateAsync(database);
         _store = new CardDatabaseStore(database);
 
         await _store.ReplaceAllAsync(Cards());

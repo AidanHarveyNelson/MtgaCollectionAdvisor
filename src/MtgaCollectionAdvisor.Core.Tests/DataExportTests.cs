@@ -32,7 +32,7 @@ public sealed class DataExportTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _database = new Database(_databasePath);
-        await SchemaInitializer.EnsureCreatedAsync(_database);
+        await SchemaMigrator.MigrateAsync(_database);
     }
 
     public Task DisposeAsync()

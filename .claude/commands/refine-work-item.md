@@ -40,9 +40,9 @@ Work out, concretely:
 
 - **Which projects are involved**: `Core` (all logic), `Web` (Blazor UI), `Core.Tests`.
 - **What types change** — records, services, stores — with their real names and namespaces.
-- **What SQLite schema changes** are needed, if any. There is no ORM and no migration tool:
-  schema lives in `Storage/SchemaInitializer.cs` and must stay `CREATE TABLE IF NOT EXISTS`
-  compatible with existing databases in the wild.
+- **What SQLite schema changes** are needed, if any. There is no ORM: a schema change is a
+  new migration appended to `Storage/Migrations.cs` (never an edit to an existing one), and
+  must carry user data across. See "Database schema" in `CLAUDE.md`.
 - **What can be tested without a UI or a database.** Prefer moving logic into `Core` over
   writing a test that needs a rendered component. Tests needing storage use a throwaway
   SQLite file.

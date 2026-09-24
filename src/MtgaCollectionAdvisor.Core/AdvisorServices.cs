@@ -71,7 +71,7 @@ public sealed class AdvisorServices : IAsyncDisposable
     public static async Task<AdvisorServices> CreateAsync(AppConfig config, CancellationToken ct = default)
     {
         var services = new AdvisorServices(config);
-        await SchemaInitializer.EnsureCreatedAsync(services.Database, ct);
+        await SchemaMigrator.MigrateAsync(services.Database, ct);
         return services;
     }
 
