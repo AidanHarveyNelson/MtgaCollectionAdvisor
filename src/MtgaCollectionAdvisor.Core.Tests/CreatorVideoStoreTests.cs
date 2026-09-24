@@ -12,7 +12,7 @@ public sealed class CreatorVideoStoreTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var database = new Database(_databasePath);
-        await SchemaInitializer.EnsureCreatedAsync(database);
+        await SchemaMigrator.MigrateAsync(database);
         _store = new CreatorVideoStore(database);
     }
 

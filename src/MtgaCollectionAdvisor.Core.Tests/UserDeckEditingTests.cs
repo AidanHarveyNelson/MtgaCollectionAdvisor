@@ -21,7 +21,7 @@ public sealed class UserDeckEditingTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var database = new Database(_databasePath);
-        await SchemaInitializer.EnsureCreatedAsync(database);
+        await SchemaMigrator.MigrateAsync(database);
         _decks = new CuratedDeckStore(database);
         _pins = new PinnedDeckStore(database);
 
