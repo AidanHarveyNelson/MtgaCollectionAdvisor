@@ -18,8 +18,9 @@ public sealed record ArenaDeckChoice(ArenaDeck Deck, FormatDefinition? Format, b
 public static class ArenaDeckImport
 {
     /// <summary>
-    /// Arena's format names to the app's. Arena calls Pioneer "Explorer" (a subset of it,
-    /// so an Explorer deck is a legal Pioneer deck). A new format is one line here.
+    /// Arena's format names to the app's. Explorer is Arena's name for Pioneer - the two
+    /// have been unified, so older decks may still carry either name. A new format is one
+    /// line here.
     /// </summary>
     private static readonly Dictionary<string, FormatDefinition> FormatsByArenaName = new(StringComparer.OrdinalIgnoreCase)
     {

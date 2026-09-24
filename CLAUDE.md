@@ -27,7 +27,7 @@ Reading process memory (`Core/Memory/`) is the only route. Wildcard totals *are*
 including `CommandZone` and `Companions`). About half the list is Wizards' decks: suggested
 decks have `IsNetDeck`, and precons have `?=?Loc/...` names. Arena writes the list only at
 login, so it is stored (`arena_decks`) rather than re-read. Two traps when turning them into app decks:
-Arena calls Pioneer **Explorer**, and it lists a companion in `Companions` *and* in
+Arena names Pioneer **Explorer** (the two are unified; decks may carry either name), and it lists a companion in `Companions` *and* in
 `Sideboard`, so read the sideboard only (`ArenaDeckImport`).
 
 Two traps in the scanner, both fixed and both easy to reintroduce:
