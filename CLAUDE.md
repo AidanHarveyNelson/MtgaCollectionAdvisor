@@ -57,13 +57,15 @@ manifest, not from the executable's embedded icon.
 case it reconnects, so `OnCircuitClosedAsync` fires far too late. Nothing stops until a
 first window has connected, so a `--no-browser` run that nobody opens stays up. A second
 launch finds the running instance through `/instance` and opens a window on it. An
-instance from before #34, or one killed mid-shutdown, can still hold port 5199 and lock
-`bin/` DLLs, so check `tasklist` before blaming a port conflict or a broken build.
+instance killed mid-shutdown can still hold port 5199 and lock `bin/` DLLs, so check
+`tasklist` before blaming a port conflict or a broken build.
 
 **Test on another port while the user has the app open:** set `MTGA_ADVISOR_PORT` (e.g.
 5299) for the test run. On 5199, a copy started for testing is where the user's desktop
 shortcut opens its window, and stopping it breaks their session mid-use with nothing
-saying why. Both copies share `advisor.db`, so a test still writes the user's data.
+saying why. Both copies share `advisor.db` unless `MTGA_ADVISOR_DB_PATH` points the test
+copy at another file, such as a copy of the user's database; without it, a test writes the
+user's data.
 
 **Verify with `dotnet run`, not by launching the `.exe` in `bin/`.** Run that way, outside
 a publish, the app is in Production and serves no `wwwroot`: every page arrives with no CSS,

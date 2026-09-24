@@ -111,12 +111,13 @@ QA report, and say what you tried. Never delete or skip a failing test.
 dotnet build MtgaCollectionAdvisor.slnx -c Release -v minimal
 ```
 
-Then run it and check what actually reaches the browser:
+Then run it on the test port, so the user's own window on 5199 is left alone (see "Test on
+another port" in `CLAUDE.md`), and check what actually reaches the browser:
 
 ```bash
-dotnet run --project src/MtgaCollectionAdvisor.Web/MtgaCollectionAdvisor.Web.csproj --no-build -- --no-browser &
+MTGA_ADVISOR_PORT=5299 dotnet run --project src/MtgaCollectionAdvisor.Web/MtgaCollectionAdvisor.Web.csproj -c Release --no-build -- --no-browser &
 # wait ~15s, then:
-curl -s http://localhost:5199/ -o page.html -w "%{http_code}"
+curl -s http://localhost:5299/ -o page.html -w "%{http_code}"
 ```
 
 Assert, at minimum:
@@ -127,11 +128,13 @@ Assert, at minimum:
   clickable, with no error anywhere**. Their absence is a real bug, not a test artifact.
 - Features that already worked still render.
 
-Stop the app afterwards (`taskkill //IM "MtgaCollectionAdvisor.Web.exe" //F`).
+Stop that copy afterwards by the process listening on 5299
+(`netstat -ano | grep ":5299 .*LISTENING"`, then `taskkill //PID <pid> //F`). Killing by image
+name would also close the user's window.
 
-Browser automation is usually unavailable, so click-through paths (typing, clicking,
-drag) generally **cannot** be verified here. Do not claim otherwise — write them up under
-Manual Testing Required with concrete steps and expected results.
+Click-through paths (typing, clicking, drag) count as verified only if browser automation
+was actually used to drive them. Everything else goes under Manual Testing Required with
+concrete steps and expected results, never implied as tested.
 
 Anything touching the memory scanner also needs MTG Arena running; if it is closed, say so
 rather than reporting the scan as verified.
