@@ -79,6 +79,18 @@ public static class SchemaInitializer
             full_walk_at  TEXT
         );
 
+        -- The decks saved in MTG Arena as it last logged them at login, kept so they can be
+        -- exported with Arena closed or after Player.log has rotated. Replaced whole on
+        -- each capture.
+        CREATE TABLE IF NOT EXISTS arena_decks (
+            deck_id      TEXT PRIMARY KEY,
+            name         TEXT NOT NULL,
+            format       TEXT NOT NULL,
+            wizards      INTEGER NOT NULL,
+            cards_json   TEXT NOT NULL,
+            captured_at  TEXT NOT NULL
+        );
+
         -- Creator videos: what each video's description told us, so neither its feed nor
         -- Archidekt is asked again. The description itself is not kept.
         CREATE TABLE IF NOT EXISTS creator_videos (

@@ -1,70 +1,155 @@
+@using MtgaCollectionAdvisor.Core.Arena
 @using MtgaCollectionAdvisor.Core.Models
 @inject AdvisorSession Session
 
 <div class="modal-backdrop" @onclick="OnCancel">
     <div class="modal-panel" @onclick:stopPropagation>
-        <h2>@(IsEdit ? "Edit deck" : "Import deck")</h2>
-        <p class="hint">
-            Paste a list in Arena's export format (e.g. <code>4 Lightning Bolt (STA) 42</code>),
-            with an optional <code>Sideboard</code> section.
-        </p>
+        <h2>@(IsEdit ? "Edit deck" : _arenaChoices is not null ? "Your Arena decks" : "Import deck")</h2>
 
-        <div class="field">
-            <label for="deck-name">Name</label>
-            <input id="deck-name" type="text" placeholder="My deck"
-                   value="@_name" @oninput="e => _name = e.Value?.ToString() ?? string.Empty" />
-        </div>
-
-        <div class="field">
-            <label for="deck-format">Format</label>
-            <select id="deck-format" @onchange="OnFormatChanged">
-                @foreach (var format in Formats.All)
-                {
-                    <option value="@format.Key" selected="@(_format.Key == format.Key)">@format.DisplayName</option>
-                }
-            </select>
-        </div>
-
-        <div class="field">
-            <label for="deck-list">Decklist</label>
-            <textarea id="deck-list" class="export-area" placeholder="Deck&#10;4 Card Name&#10;..."
-                      @oninput="OnDecklistChangedAsync">@_decklist</textarea>
-        </div>
-
-        @if (_preview is not null)
+        @if (_arenaChoices is not null)
         {
-            @* What this list would cost, before committing to it. A bare total decides
-               nothing - five commons is pocket change, five mythics is weeks of play. *@
-            <div class="wc-preview">
-                <div class="wc-preview-head">
-                    <span class="picker-label">Wildcards needed</span>
-                    <span class="result-count">
-                        @_preview.OwnedFraction.ToString("P0") of the list already yours
-                    </span>
+            @* Pick decks saved in MTG Arena to keep in the app. Nothing syncs by itself: what is
+               ticked becomes a user deck, which stays here even after it is deleted in Arena. *@
+            <p class="hint">
+                Read from Player.log on @Session.ArenaDecksCapturedAt?.ToLocalTime().ToString("g").
+                Tick the decks to keep in the app - they stay here even if you delete them in Arena,
+                and <b>Copy for Arena</b> takes them back.
+            </p>
+
+            @if (_arenaChoices.Count == 0)
+            {
+                <p class="hint">No decks of your own in the list Arena logged.</p>
+            }
+            else
+            {
+                @* Ticks survive a filter change: the Add button counts every picked deck. *@
+                <div class="segmented arena-filter">
+                    @foreach (var (key, label) in ArenaFilters())
+                    {
+                        var count = ArenaDeckImport.Filter(_arenaChoices, key).Count;
+                        <button class="@(_arenaFilter == key ? "active" : "")" disabled="@(count == 0)"
+                                @onclick="() => _arenaFilter = key">
+                            @label <span class="count">@count</span>
+                        </button>
+                    }
                 </div>
 
-                <WildcardCost Needed="_preview.Needed" Large="true" />
+                <div class="arena-picker">
+                    @foreach (var choice in ArenaDeckImport.Filter(_arenaChoices, _arenaFilter))
+                    {
+                        var id = choice.Deck.Id;
+                        <label class="arena-deck @(choice.IsSupported ? "" : "unsupported")">
+                            <input type="checkbox" disabled="@(!choice.IsSupported)"
+                                   checked="@_picked.Contains(id)" @onchange="() => TogglePick(id)" />
+                            <span class="arena-deck-name">@choice.Deck.Name</span>
+                            <span class="arena-deck-meta">
+                                @(choice.Format?.DisplayName ?? choice.Deck.Format) · @choice.CardCount cards
+                                @if (!choice.IsSupported)
+                                {
+                                    <span> · not supported yet</span>
+                                }
+                                @if (choice.InApp)
+                                {
+                                    <span class="badge yes" title="Ticking it again updates it from Arena, pin included">In the app</span>
+                                }
+                            </span>
+                            @if (choice.UnknownCards > 0)
+                            {
+                                <span class="arena-deck-warning">
+                                    @choice.UnknownCards card@(choice.UnknownCards == 1 ? "" : "s") not in the card database - run Update cards first
+                                </span>
+                            }
+                        </label>
+                    }
+                </div>
+            }
 
-                @if (_preview.UnavailableOnArena.Count > 0)
-                {
-                    <div class="deck-warning">Not on Arena: @string.Join(", ", _preview.UnavailableOnArena)</div>
-                }
-                @if (_preview.IllegalInFormat.Count > 0)
-                {
-                    <div class="deck-warning">Not legal in @_format.DisplayName: @string.Join(", ", _preview.IllegalInFormat)</div>
-                }
+            <div class="modal-actions">
+                <button @onclick="() => _arenaChoices = null">Back</button>
+                <button @onclick="OnCancel">Cancel</button>
+                <button class="primary" disabled="@(_picked.Count == 0)" @onclick="ImportArenaDecksAsync">
+                    @(_picked.Count == 0 ? "Add decks" : $"Add {_picked.Count} deck{(_picked.Count == 1 ? "" : "s")}")
+                </button>
             </div>
         }
-
-        @if (_error is not null)
+        else
         {
-            <p class="error-text">@_error</p>
-        }
+            <p class="hint">
+                Paste a list in Arena's export format (e.g. <code>4 Lightning Bolt (STA) 42</code>),
+                with an optional <code>Sideboard</code> section.
+            </p>
 
-        <div class="modal-actions">
-            <button @onclick="OnCancel">Cancel</button>
-            <button class="primary" @onclick="SaveAsync">@(IsEdit ? "Save" : "Import")</button>
-        </div>
+            @if (!IsEdit)
+            {
+                @if (Session.ArenaDecksCapturedAt is { } readAt)
+                {
+                    <button class="arena-link" @onclick="OpenArenaDecksAsync">
+                        See your Arena decks <span>(read from Player.log on @readAt.ToLocalTime().ToString("g"))</span>
+                    </button>
+                }
+                else
+                {
+                    <p class="hint">To pick from the decks saved in MTG Arena, log in to Arena while this app is running.</p>
+                }
+            }
+
+            <div class="field">
+                <label for="deck-name">Name</label>
+                <input id="deck-name" type="text" placeholder="My deck"
+                       value="@_name" @oninput="e => _name = e.Value?.ToString() ?? string.Empty" />
+            </div>
+
+            <div class="field">
+                <label for="deck-format">Format</label>
+                <select id="deck-format" @onchange="OnFormatChanged">
+                    @foreach (var format in Formats.All)
+                    {
+                        <option value="@format.Key" selected="@(_format.Key == format.Key)">@format.DisplayName</option>
+                    }
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="deck-list">Decklist</label>
+                <textarea id="deck-list" class="export-area" placeholder="Deck&#10;4 Card Name&#10;..."
+                          @oninput="OnDecklistChangedAsync">@_decklist</textarea>
+            </div>
+
+            @if (_preview is not null)
+            {
+                @* What this list would cost, before committing to it. A bare total decides
+                   nothing - five commons is pocket change, five mythics is weeks of play. *@
+                <div class="wc-preview">
+                    <div class="wc-preview-head">
+                        <span class="picker-label">Wildcards needed</span>
+                        <span class="result-count">
+                            @_preview.OwnedFraction.ToString("P0") of the list already yours
+                        </span>
+                    </div>
+
+                    <WildcardCost Needed="_preview.Needed" Large="true" />
+
+                    @if (_preview.UnavailableOnArena.Count > 0)
+                    {
+                        <div class="deck-warning">Not on Arena: @string.Join(", ", _preview.UnavailableOnArena)</div>
+                    }
+                    @if (_preview.IllegalInFormat.Count > 0)
+                    {
+                        <div class="deck-warning">Not legal in @_format.DisplayName: @string.Join(", ", _preview.IllegalInFormat)</div>
+                    }
+                </div>
+            }
+
+            @if (_error is not null)
+            {
+                <p class="error-text">@_error</p>
+            }
+
+            <div class="modal-actions">
+                <button @onclick="OnCancel">Cancel</button>
+                <button class="primary" @onclick="SaveAsync">@(IsEdit ? "Save" : "Import")</button>
+            </div>
+        }
     </div>
 </div>
 
@@ -161,4 +246,36 @@
     }
 
     private Task OnCancel() => OnClose.InvokeAsync();
+
+    // ---------- Decks saved in Arena ----------
+
+    /// <summary>Null while pasting; the picker's list once opened.</summary>
+    private IReadOnlyList<ArenaDeckChoice>? _arenaChoices;
+    private readonly HashSet<string> _picked = [];
+
+    /// <summary>A format key, <see cref="ArenaDeckImport.OtherFormats"/>, or null for all.</summary>
+    private string? _arenaFilter;
+
+    private static IEnumerable<(string? Key, string Label)> ArenaFilters() =>
+        [(null, "All"), .. Formats.All.Select(f => ((string?)f.Key, f.DisplayName)), (ArenaDeckImport.OtherFormats, "Other")];
+
+    private async Task OpenArenaDecksAsync()
+    {
+        _picked.Clear();
+        _arenaChoices = await Session.GetArenaDeckChoicesAsync();
+
+        // Open on the format the user is looking at, unless they have no decks in it.
+        _arenaFilter = ArenaDeckImport.Filter(_arenaChoices, Session.Format.Key).Count > 0 ? Session.Format.Key : null;
+    }
+
+    private void TogglePick(string arenaDeckId)
+    {
+        if (!_picked.Remove(arenaDeckId)) _picked.Add(arenaDeckId);
+    }
+
+    private async Task ImportArenaDecksAsync()
+    {
+        await Session.ImportArenaDecksAsync(_picked.ToList());
+        await OnClose.InvokeAsync();
+    }
 }

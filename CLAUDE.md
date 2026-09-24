@@ -21,6 +21,15 @@ main menu, and opening the in-game Collection screen. Do not spend time looking 
 Reading process memory (`Core/Memory/`) is the only route. Wildcard totals *are* still in
 `Player.log` and are read from there.
 
+**The decks saved in Arena *are* in `Player.log`**, unlike the collection. They come in the
+`StartHook` login message, which is also the one carrying wildcard totals: `DeckSummaries`
+(name, `Format` attribute, `IsNetDeck`) and `DecksInternal` (cards by grpId per section,
+including `CommandZone` and `Companions`). About half the list is Wizards' decks: suggested
+decks have `IsNetDeck`, and precons have `?=?Loc/...` names. Arena writes the list only at
+login, so it is stored (`arena_decks`) rather than re-read. Two traps when turning them into app decks:
+Arena calls Pioneer **Explorer**, and it lists a companion in `Companions` *and* in
+`Sideboard`, so read the sideboard only (`ArenaDeckImport`).
+
 Two traps in the scanner, both fixed and both easy to reintroduce:
 
 - **Chunked reads must overlap.** A collection table straddling a chunk boundary gets split,
@@ -50,6 +59,11 @@ first window has connected, so a `--no-browser` run that nobody opens stays up. 
 launch finds the running instance through `/instance` and opens a window on it. An
 instance from before #34, or one killed mid-shutdown, can still hold port 5199 and lock
 `bin/` DLLs, so check `tasklist` before blaming a port conflict or a broken build.
+
+**Test on another port while the user has the app open:** set `MTGA_ADVISOR_PORT` (e.g.
+5299) for the test run. On 5199, a copy started for testing is where the user's desktop
+shortcut opens its window, and stopping it breaks their session mid-use with nothing
+saying why. Both copies share `advisor.db`, so a test still writes the user's data.
 
 **Verify with `dotnet run`, not by launching the `.exe` in `bin/`.** Run that way, outside
 a publish, the app is in Production and serves no `wwwroot`: every page arrives with no CSS,
