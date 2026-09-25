@@ -1,0 +1,98 @@
+name: Release
+
+# A release is a pushed v* tag: this tests, publishes, packs with Velopack and uploads the
+# installer, portable zip, update packages and SHA-256 sums to a GitHub Release.
+# On a pull request that touches this file it is a dry run: it builds and packs as a
+# 0.0.0-pr.N version, keeps the packages as a workflow artifact, and publishes nothing.
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths: ['.github/workflows/release.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      # Must equal the Velopack package version in MtgaCollectionAdvisor.Web.csproj
+      # (ReleaseWorkflowTests): the installer and the in-app updater move together.
+      VPK_VERSION: 1.2.158
+      REPO_URL: https://github.com/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=0.0.0-pr.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          fi
+
+      - run: dotnet test MtgaCollectionAdvisor.slnx --configuration Release
+
+      # The same shape publish-local.ps1 builds, stamped with the release version.
+      - name: Publish
+        shell: bash
+        run: |
+          dotnet publish src/MtgaCollectionAdvisor.Web -c Release -r win-x64 --self-contained \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:DebugType=None -p:Version="$VERSION" -o publish-out
+          rm -f publish-out/appsettings.Development.json
+
+      - run: dotnet tool install -g vpk --version ${{ env.VPK_VERSION }}
+
+      # Delta packages are built against the previous release; the first release has none.
+      - name: Previous release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "$(gh release list --repo "${{ github.repository }}" --limit 1)" ]; then
+            vpk download github --repoUrl "$REPO_URL" --token "$GH_TOKEN" -o Releases
+          fi
+
+      # packId is not the data folder's name (MtgaCollectionAdvisor): uninstalling deletes
+      # %LOCALAPPDATA%\<packId>, and the player's data must survive that.
+      - name: Pack
+        shell: bash
+        run: |
+          vpk pack --packId MtgaDeckAdvisor --packVersion "$VERSION" --packDir publish-out \
+            --mainExe MtgaCollectionAdvisor.Web.exe --packTitle "MTGA Deck Advisor" \
+            --packAuthors "Dasayeve" --icon src/MtgaCollectionAdvisor.Web/app.ico -o Releases
+          cd Releases && sha256sum *Setup.exe *Portable.zip > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Dry-run artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dry-run
+          path: Releases/
+
+      - name: Upload release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          vpk upload github --repoUrl "$REPO_URL" --token "${{ secrets.GITHUB_TOKEN }}" -o Releases \
+            --publish --tag "$GITHUB_REF_NAME" --releaseName "MTGA Deck Advisor $VERSION"
+
+      - name: Notes and checksums
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" Releases/SHA256SUMS.txt --repo "${{ github.repository }}"
+          notes=$(gh api -X POST "repos/${{ github.repository }}/releases/generate-notes" -f tag_name="$GITHUB_REF_NAME" --jq .body)
+          printf '%s\n\n## SHA-256\n\n```\n%s\n```\n' "$notes" "$(cat Releases/SHA256SUMS.txt)" > notes.md
+          gh release edit "$GITHUB_REF_NAME" --notes-file notes.md --repo "${{ github.repository }}"

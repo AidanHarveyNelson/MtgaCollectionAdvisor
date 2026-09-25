@@ -9,6 +9,12 @@ namespace MtgaCollectionAdvisor.Core.Storage;
 /// </summary>
 public sealed class Database(string filePath)
 {
+    /// <summary>
+    /// The folder under %LOCALAPPDATA% that holds the player's data. The installer must never
+    /// install into it: uninstalling deletes the install folder (ReleaseWorkflowTests).
+    /// </summary>
+    public const string DataFolderName = "MtgaCollectionAdvisor";
+
     public string FilePath { get; } = filePath;
 
     public async Task<SqliteConnection> OpenAsync(CancellationToken ct = default)
@@ -29,7 +35,7 @@ public sealed class Database(string filePath)
     {
         var path = overridePath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "MtgaCollectionAdvisor",
+            DataFolderName,
             "advisor.db");
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
