@@ -67,6 +67,17 @@ saying why. Both copies share `advisor.db` unless `MTGA_ADVISOR_DB_PATH` points 
 copy at another file, such as a copy of the user's database; without it, a test writes the
 user's data.
 
+**A browser-automation tab is hidden, and Edge freezes hidden tabs** (#56). After a minute
+idle, scripts and screenshots in it time out ("renderer frozen"), its circuit drops, and 45 s
+later the app stops as if its window had closed. That is not an app bug. Keep driving the tab,
+or check the outcome server-side (`curl` the page, look at the database).
+
+**The first-run setup (#56) resumes through a marker file**, `advisor.db.setup`, next to the
+database. It is created when the setup starts and deleted when it finishes, so a setup closed
+midway comes back even though the cards and decks it stored no longer call for it. Delete the
+marker to drop an unfinished setup; delete the database (or point `MTGA_ADVISOR_DB_PATH` at a
+new file) to see the setup again.
+
 **Verify with `dotnet run`, not by launching the `.exe` in `bin/`.** Run that way, outside
 a publish, the app is in Production and serves no `wwwroot`: every page arrives with no CSS,
 and no error.
@@ -165,7 +176,9 @@ Archidekt's API is the readable deck source.
 `orderBy=-viewCount` is all-time: its top pages are years-old, rotated decks and never
 change. The fetch walks `orderBy=-updatedAt` instead (#36). Standard gets roughly 150
 updated decks a *day*, so a walk reaches only a few days back, whatever window the code
-sets. Keep to `ArchidektSyncPlanner`'s limits; they are what keeps the app polite.
+sets. Keep to `ArchidektSyncPlanner`'s limits (a deck read every 300 ms, 150 per fetch, 5 min
+between fetches of a format); they are what keeps the app polite. A failed read, a 429
+included, stops the fetch and keeps what was read.
 
 **YouTube's public channel feeds fail at random (404/500), and throttle a machine that asks
 too often** — during #32, bulk probing got every feed refused for hours, for the app too.

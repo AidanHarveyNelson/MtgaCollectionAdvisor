@@ -14,7 +14,7 @@ namespace MtgaCollectionAdvisor.Web.Services;
 /// deck fetch, card database import). Components subscribe to <see cref="Changed"/>
 /// and re-render; nothing in the UI ever blocks on a scan.
 /// </summary>
-public sealed class AdvisorSession(AppConfig config) : IAsyncDisposable
+public sealed partial class AdvisorSession(AppConfig config) : IAsyncDisposable
 {
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private System.Threading.Timer? _mtgaWatchTimer;
@@ -57,6 +57,7 @@ public sealed class AdvisorSession(AppConfig config) : IAsyncDisposable
         services.PlayerLogWatcher.Start();
 
         await ReloadRankingAsync();
+        await StartSetupIfNeededAsync();
 
         _mtgaWatchTimer = new System.Threading.Timer(_ => _ = AutoScanIfGameStartedAsync(), null,
             TimeSpan.Zero, TimeSpan.FromSeconds(20));
@@ -68,33 +69,45 @@ public sealed class AdvisorSession(AppConfig config) : IAsyncDisposable
         await ReloadRankingAsync();
     }
 
-    public Task ScanCollectionAsync() => RunAsync("Capturing collection", async report =>
+    public Task ScanCollectionAsync() => RunAsync("Capturing collection", report => CaptureAsync(report));
+
+    public Task FetchDecksAsync() => RunAsync($"Fetching {Format.DisplayName} decks", report => FetchDecksAsync(Format, report));
+
+    public Task RefreshCardDatabaseAsync() => RunAsync("Updating card database", ImportCardsAsync);
+
+    // The bodies of the operations above, shared with the first-run setup, which needs to
+    // know whether each one worked rather than only what it said in the status bar.
+
+    /// <summary>False when the collection was not found in MTG Arena's memory.</summary>
+    private async Task<bool> CaptureAsync(Action<string> report)
     {
         var result = await services.MemoryCollectionSyncService.SyncAutomaticallyAsync(new Progress<string>(report));
         if (result is null)
         {
             report("Could not find the collection in memory. Open MTG Arena and visit the Collection screen.");
-            return;
+            return false;
         }
         report($"Collection captured: {result.DistinctCards} cards ({result.TotalCopies} copies).");
         await ReloadRankingAsync();
-    });
+        return true;
+    }
 
-    public Task FetchDecksAsync() => RunAsync($"Fetching {Format.DisplayName} decks", async report =>
+    private async Task<DeckSyncReport> FetchDecksAsync(FormatDefinition format, Action<string> report)
     {
-        var result = await services.ArchidektDeckSync.SyncAsync(Format, new ImmediateProgress(report));
+        var result = await services.ArchidektDeckSync.SyncAsync(format, new ImmediateProgress(report));
         await ReloadRankingAsync();
         report(result.Describe());
-    });
+        return result;
+    }
 
-    public Task RefreshCardDatabaseAsync() => RunAsync("Updating card database", async report =>
+    private async Task ImportCardsAsync(Action<string> report)
     {
         report("Downloading Scryfall bulk data (a few minutes)...");
         await services.CardDatabaseStore.ReplaceAllAsync(services.ScryfallBulkImporter.ImportAsync());
         CardsUpdatedAt = await services.CardDatabaseStore.GetLastImportedAsync();
         report("Card database updated.");
         await ReloadRankingAsync();
-    });
+    }
 
     public Task DeleteDeckAsync(string sourceId) => RunAsync("Removing deck", async report =>
     {
@@ -206,18 +219,20 @@ public sealed class AdvisorSession(AppConfig config) : IAsyncDisposable
     {
         if (!CreatorVideosEnabled) return Task.CompletedTask;
 
-        return RunAsync("Loading creator videos", async report =>
-        {
-            var loaded = await services.CreatorVideoService.LoadAsync(force);
-            _creatorVideoSources = loaded.Videos;
-            CreatorVideos = await services.CreatorVideoService.PriceAsync(loaded.Videos, Collection);
+        return RunAsync("Loading creator videos", report => LoadCreatorsAsync(force, report));
+    }
 
-            var withDeck = CreatorVideos.Count(c => c.Analysis is not null);
-            var unavailable = loaded.FailedFeeds > 0
-                ? $" ({loaded.FailedFeeds} creator feed{(loaded.FailedFeeds == 1 ? "" : "s")} unavailable, showing what was cached)"
-                : "";
-            report($"{CreatorVideos.Count} creator videos, {withDeck} with a deck priced against your collection.{unavailable}");
-        });
+    private async Task LoadCreatorsAsync(bool force, Action<string> report)
+    {
+        var loaded = await services.CreatorVideoService.LoadAsync(force);
+        _creatorVideoSources = loaded.Videos;
+        CreatorVideos = await services.CreatorVideoService.PriceAsync(loaded.Videos, Collection);
+
+        var withDeck = CreatorVideos.Count(c => c.Analysis is not null);
+        var unavailable = loaded.FailedFeeds > 0
+            ? $" ({loaded.FailedFeeds} creator feed{(loaded.FailedFeeds == 1 ? "" : "s")} unavailable, showing what was cached)"
+            : "";
+        report($"{CreatorVideos.Count} creator videos, {withDeck} with a deck priced against your collection.{unavailable}");
     }
 
     /// <summary>Costs follow the collection; what a video's deck is does not, so no fetch here.</summary>
@@ -340,6 +355,9 @@ public sealed class AdvisorSession(AppConfig config) : IAsyncDisposable
         var running = MemoryCollectionSyncService.IsMtgaRunning();
         var justStarted = running && !_mtgaWasRunning;
         _mtgaWasRunning = running;
+
+        // The setup screen runs its own MTG Arena step; the page it would scan for isn't shown.
+        if (Setup is not null) return;
 
         if (justStarted && !IsBusy) await ScanCollectionAsync();
     }
@@ -491,6 +509,7 @@ public sealed class AdvisorSession(AppConfig config) : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (_mtgaWatchTimer is not null) await _mtgaWatchTimer.DisposeAsync();
+        if (_setupArenaPoll is not null) await _setupArenaPoll.DisposeAsync();
         if (services is not null) await services.DisposeAsync();
         _operationGate.Dispose();
     }
