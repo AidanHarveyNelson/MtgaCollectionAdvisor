@@ -74,7 +74,7 @@ jobs:
         run: |
           vpk pack --packId MtgaDeckAdvisor --packVersion "$VERSION" --packDir publish-out \
             --mainExe MtgaCollectionAdvisor.Web.exe --packTitle "MTGA Deck Advisor" \
-            --packAuthors "Dasayeve" --icon src/MtgaCollectionAdvisor.Web/app.ico -o Releases
+            --packAuthors "Dasayeve" --icon src/MtgaCollectionAdvisor.Web/app.ico --runtime win-x64 -o Releases
           cd Releases && sha256sum *Setup.exe *Portable.zip > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       - name: Dry-run artifact
