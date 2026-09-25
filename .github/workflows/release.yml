@@ -3,7 +3,7 @@ name: Release
 # A release is a pushed v* tag: this tests, publishes, packs with Velopack and uploads the
 # installer, portable zip, update packages and SHA-256 sums to a GitHub Release.
 # On a pull request that touches this file it is a dry run: it builds and packs as a
-# 0.0.0-pr.N version, keeps the packages as a workflow artifact, and publishes nothing.
+# 0.0.<run>-dryrun version, keeps the packages as a workflow artifact, and publishes nothing.
 on:
   push:
     tags: ['v*']
@@ -35,7 +35,7 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
           else
-            echo "VERSION=0.0.0-pr.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+            echo "VERSION=0.0.${GITHUB_RUN_NUMBER}-dryrun" >> "$GITHUB_ENV"  # vpk refuses versions below 0.0.1
           fi
 
       - run: dotnet test MtgaCollectionAdvisor.slnx --configuration Release
