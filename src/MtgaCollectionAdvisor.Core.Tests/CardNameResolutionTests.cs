@@ -146,6 +146,24 @@ public sealed class CardNameResolutionTests : IAsyncLifetime
         Assert.Equal(OjerBack, gap.BackImageUrl);
     }
 
+    // A database imported before #59 has cards and no URL at all: the app re-imports it once
+    // on its own. Only then; a partly filled or empty database is left alone.
+    [Theory]
+    [InlineData(19977, 0, true)]
+    [InlineData(19977, 19977, false)]
+    [InlineData(19977, 3, false)]
+    [InlineData(0, 0, false)]
+    public void NeedsImageBackfill_Should_OnlyAskForCardsWithoutAnyImage(int cards, int withImage, bool expected)
+    {
+        Assert.Equal(expected, CardDatabaseStore.NeedsImageBackfill(cards, withImage));
+    }
+
+    [Fact]
+    public async Task CountImagesAsync_Should_CountCardsAndThoseWithAnImage()
+    {
+        Assert.Equal((8, 1), await _store.CountImagesAsync());
+    }
+
     private const string OjerFront = "https://cards.scryfall.io/normal/front/1/2/ojer.jpg";
     private const string OjerBack = "https://cards.scryfall.io/normal/back/1/2/ojer.jpg";
 

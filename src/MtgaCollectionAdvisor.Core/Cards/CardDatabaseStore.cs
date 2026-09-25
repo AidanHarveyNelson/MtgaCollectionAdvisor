@@ -76,6 +76,22 @@ public sealed class CardDatabaseStore(Database database)
         await transaction.CommitAsync(ct);
     }
 
+    /// <summary>
+    /// A card database imported before the image URLs were kept (#59) has cards and no URL at
+    /// all: it needs one more import for the hover previews, which the app runs by itself.
+    /// </summary>
+    public static bool NeedsImageBackfill(int cards, int cardsWithImage) => cards > 0 && cardsWithImage == 0;
+
+    public async Task<(int Cards, int CardsWithImage)> CountImagesAsync(CancellationToken ct = default)
+    {
+        await using var connection = await database.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT count(*), count(image_url) FROM cards";
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        await reader.ReadAsync(ct);
+        return (reader.GetInt32(0), reader.GetInt32(1));
+    }
+
     public async Task<DateTimeOffset?> GetLastImportedAsync(CancellationToken ct = default)
     {
         await using var connection = await database.OpenAsync(ct);
