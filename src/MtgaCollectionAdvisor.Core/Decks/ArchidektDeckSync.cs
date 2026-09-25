@@ -13,6 +13,17 @@ public sealed record DeckSyncReport(
     string? StoppedBecause,
     TimeSpan? CooldownRemaining)
 {
+    /// <summary>
+    /// Why a fetch left the pool empty, for the first-run setup, where "no new decks since the
+    /// last fetch" would read as success. There was no last fetch.
+    /// </summary>
+    public string DescribeEmptyPool()
+    {
+        if (CooldownRemaining is not null) return Describe();
+        if (StoppedBecause is not null) return $"Could not reach Archidekt: {StoppedBecause}";
+        return "Archidekt returned no recent Standard decks.";
+    }
+
     /// <summary>The line the status bar shows once the fetch is over.</summary>
     public string Describe()
     {
@@ -114,7 +125,7 @@ public sealed class ArchidektDeckSync(ArchidektClient client, CuratedDeckStore d
 
                 await PauseAsync();
                 detailRequests++;
-                progress.Report($"Reading deck {detailRequests} from Archidekt: {listing.Name}");
+                progress.Report($"Reading deck {detailRequests} (of up to {ArchidektSyncPlanner.MaxDetailRequests}) from Archidekt: {listing.Name}");
 
                 try
                 {

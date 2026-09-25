@@ -1,0 +1,119 @@
+@using MtgaCollectionAdvisor.Core.Onboarding
+@implements IDisposable
+@inject AdvisorSession Session
+
+@* The first-run setup (#56). Everything it shows is Session.Setup; what runs and in which
+   order is decided in Core (SetupPlan), not here. *@
+@if (Session.Setup is { } setup)
+{
+    var current = setup.Current;
+    var currentState = current is { } c ? setup.States[c] : SetupStepState.Done;
+
+    <div class="setup">
+        <div class="setup-card">
+            <div class="brand-name">MTGA <span>Deck Advisor</span></div>
+            <h1>Setting things up</h1>
+            <p class="setup-intro">
+                This happens once. The app downloads the card list and recent decks, then reads
+                your collection from MTG Arena. It takes a couple of minutes; you can leave it running.
+            </p>
+
+            <ol class="setup-steps">
+                @foreach (var step in setup.Steps)
+                {
+                    var state = setup.States[step];
+                    <li class="setup-step @state.ToString().ToLowerInvariant() @(step == current ? "current" : "")">
+                        <span class="setup-icon" aria-hidden="true">
+                            @switch (state)
+                            {
+                                case SetupStepState.Running: <span class="spinner"></span> break;
+                                case SetupStepState.Done: <text>✓</text> break;
+                                case SetupStepState.Failed: <text>✕</text> break;
+                                case SetupStepState.Skipped: <text>–</text> break;
+                                default: <span class="dot"></span> break;
+                            }
+                        </span>
+                        <span class="setup-label">@AdvisorSession.SetupStepLabel(step)</span>
+                        <span class="setup-state">@StateText(state)</span>
+                    </li>
+                }
+            </ol>
+
+            @if (current == SetupStep.Collection && currentState == SetupStepState.Running)
+            {
+                <div class="setup-arena">
+                    @if (setup.CollectionNeedsCards)
+                    {
+                        <p>Reading your collection needs the card database, which was skipped.
+                           Skip this step for now; once the app opens, click <strong>Update cards</strong>,
+                           then <strong>Capture collection</strong> with MTG Arena open.</p>
+                    }
+                    else if (setup.Capturing)
+                    {
+                        <p class="setup-message">@setup.Message</p>
+                        <div class="setup-bar" aria-hidden="true"><span></span></div>
+                    }
+                    else if (!setup.MtgaRunning)
+                    {
+                        <p><strong>Open MTG Arena and log in.</strong> Your collection is read from the running game; this screen notices when it starts.</p>
+                        <div class="setup-bar waiting" aria-hidden="true"><span></span></div>
+                    }
+                    else
+                    {
+                        <p>@(string.IsNullOrEmpty(setup.Message)
+                                ? "MTG Arena is running. Once you are at its main menu, your collection is captured automatically."
+                                : setup.Message)</p>
+                    }
+
+                    <p class="setup-tip">
+                        Tip: in MTG Arena, turn on <em>Options → Account → Detailed Logs (Plugin Support)</em>
+                        so your wildcards show up too.
+                    </p>
+
+                    <div class="setup-actions">
+                        <button class="primary" disabled="@(!setup.MtgaRunning || setup.Capturing || setup.CollectionNeedsCards)"
+                                @onclick="() => Session.CaptureDuringSetupAsync()">
+                            Capture collection
+                        </button>
+                        <button disabled="@setup.Capturing" @onclick="() => Session.SkipSetupStepAsync()">
+                            Skip, I'll do it later
+                        </button>
+                    </div>
+                </div>
+            }
+            else if (currentState == SetupStepState.Failed)
+            {
+                <div class="setup-failed">
+                    <p class="setup-message">@setup.Message</p>
+                    <div class="setup-actions">
+                        <button class="primary" @onclick="() => Session.RetrySetupStepAsync()">Try again</button>
+                        <button @onclick="() => Session.SkipSetupStepAsync()">Skip</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <p class="setup-message">@setup.Message</p>
+                <div class="setup-bar" aria-hidden="true"><span></span></div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    // A child with no parameters is not re-rendered by its parent: follow the session directly.
+    protected override void OnInitialized() => Session.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Session.Changed -= OnChanged;
+
+    private static string StateText(SetupStepState state) => state switch
+    {
+        SetupStepState.Running => "in progress",
+        SetupStepState.Done => "done",
+        SetupStepState.Failed => "failed",
+        SetupStepState.Skipped => "skipped",
+        _ => "waiting",
+    };
+}

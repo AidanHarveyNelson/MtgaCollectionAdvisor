@@ -29,11 +29,13 @@ updates and uninstalls. Delete that folder too to remove everything.
 
 A portable zip is also attached to each release, if you'd rather not install.
 
-Then, in the app:
+**The first start sets everything up by itself** (a couple of minutes): it downloads the
+card database and recent Standard decks, then asks you to open MTG Arena and reads your
+collection from it. After that, **Fetch decks** refreshes the decks, **Update cards** the
+card database, and the collection is read again whenever MTG Arena starts.
 
-1. **Update cards**: downloads the Scryfall card database (once, ~30s).
-2. **Capture collection**: with MTG Arena open. Also runs automatically when the game starts.
-3. **Fetch decks**: pulls public lists for the selected format.
+In MTG Arena, turn on **Options → Account → Detailed Logs (Plugin Support)**: your wildcard
+totals and saved decks are read from that log.
 
 ## Build from source
 

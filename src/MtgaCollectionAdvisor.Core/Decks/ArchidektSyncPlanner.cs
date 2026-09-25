@@ -37,8 +37,13 @@ public static class ArchidektSyncPlanner
     /// <summary>Detail requests per fetch; a first fetch on an empty pool is bounded by this.</summary>
     public const int MaxDetailRequests = 150;
 
-    /// <summary>The pause before every request after the first, so a fetch is never a burst.</summary>
-    public static readonly TimeSpan RequestSpacing = TimeSpan.FromSeconds(1);
+    /// <summary>
+    /// The pause before every request after the first, so a fetch is never a burst. The same
+    /// pace the Creators tab reads Archidekt at; a failed read (a 429 included) stops the
+    /// fetch and keeps what was read. Archidekt publishes no limit, and a block would hit
+    /// every player, so faster is a bet this does not take.
+    /// </summary>
+    public static readonly TimeSpan RequestSpacing = TimeSpan.FromMilliseconds(300);
 
     /// <summary>A fetch this soon after the last one for the same format sends nothing.</summary>
     public static readonly TimeSpan Cooldown = TimeSpan.FromMinutes(5);
