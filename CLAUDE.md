@@ -87,6 +87,15 @@ new file) to see the setup again.
 a publish, the app is in Production and serves no `wwwroot`: every page arrives with no CSS,
 and no error.
 
+**A `string` component parameter needs `@` to take a field** (#62). `Copied="_copied"` works
+because a `bool` parameter's value is read as C#, but `QuoteStatus="_quoteStatus"` passes the
+text "_quoteStatus": the button showed the field's name, with no warning. Write
+`QuoteStatus="@_quoteStatus"`.
+
+**Windows has two region settings** (#62): the home location ("Country or region",
+`GetUserDefaultGeoName`) and the regional format, the only one `RegionInfo.CurrentRegion`
+follows. They often differ; `WindowsRegion` reads both.
+
 **Report progress synchronously when a final status follows.** `Progress<T>` posts each
 report to run later, so the last "Reading deck 150…" can land after the summary line and
 overwrite it in the status bar. `AdvisorSession` has an `ImmediateProgress` for this.
