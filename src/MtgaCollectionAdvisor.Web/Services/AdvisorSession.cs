@@ -141,6 +141,28 @@ public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSess
 
     public string ExportDeck(CandidateDeck deck) => ArenaDeckListWriter.Write(deck);
 
+    /// <summary>Whether the deck view offers the Liga Magic quote (#62): Windows region Brazil only.</summary>
+    public bool LigaMagicAvailable { get; } =
+        LigaMagicList.IsAvailable(WindowsRegion.HomeLocation(), WindowsRegion.RegionalFormat());
+
+    /// <summary>
+    /// Opens Liga Magic's list page in the player's default browser, where they are logged in:
+    /// its search field only appears then. Not the app's window, which has no login.
+    /// </summary>
+    public bool OpenLigaMagic()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(LigaMagicList.PageUrl) { UseShellExecute = true });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "Opening Liga Magic in the default browser failed");
+            return false;
+        }
+    }
+
     /// <summary>Writes the user's data out for the download endpoints; null before the app has started.</summary>
     public DataExportService? DataExport => services?.DataExportService;
 

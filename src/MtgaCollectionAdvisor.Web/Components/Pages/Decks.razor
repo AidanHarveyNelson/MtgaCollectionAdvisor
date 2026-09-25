@@ -3,6 +3,7 @@
 @inject AdvisorSession Session
 @inject IJSRuntime JS
 @using MtgaCollectionAdvisor.Core.Analysis
+@using MtgaCollectionAdvisor.Core.Decks
 @using MtgaCollectionAdvisor.Core.Models
 
 <PageTitle>Recommended decks</PageTitle>
@@ -308,6 +309,8 @@
                                         <DeckDetail Deck="deck"
                                                     Copied="_copied"
                                                     OnCopy="CopyDeckAsync"
+                                                    QuoteStatus="@_quoteStatus"
+                                                    OnQuote="QuoteDeckAsync"
                                                     OnEdit="() => _editing = deck"
                                                     OnRemove="() => Session.DeleteDeckAsync(deck.Deck.SourceId)" />
                                     </td>
@@ -371,6 +374,7 @@
 
     private DeckAnalysisResult? _selected;
     private bool _copied;
+    private string? _quoteStatus;
     private DeckTab _tab = DeckTab.Suggestions;
 
     /// <summary>The deck whose edit dialog is open, if any.</summary>
@@ -494,6 +498,7 @@
     {
         _selected = ReferenceEquals(deck, _selected) ? null : deck;
         _copied = false;
+        _quoteStatus = null;
     }
 
     // The deck as the panel shows it: without its non-basic lands when those are excluded (#61).
@@ -509,6 +514,24 @@
         {
             _copied = false; // clipboard blocked - the textarea below is the fallback
         }
+    }
+
+    // Copies the list, then opens Liga Magic in the player's browser, where they paste it (#62).
+    private async Task QuoteDeckAsync(DeckAnalysisResult deck)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", LigaMagicList.Write(deck));
+        }
+        catch
+        {
+            _quoteStatus = "Não foi possível copiar a lista";
+            return;
+        }
+
+        _quoteStatus = Session.OpenLigaMagic()
+            ? "Copiado! Cole na Liga Magic (Ctrl+V)"
+            : "Copiado! Abra a Liga Magic e cole (Ctrl+V)";
     }
 
     private DeckFilterCriteria BuildCriteria() => new()

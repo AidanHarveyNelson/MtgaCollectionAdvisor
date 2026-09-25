@@ -38,6 +38,13 @@
                 </a>
             }
             <button class="primary" @onclick="() => OnCopy.InvokeAsync(Shown.Deck)">@(Copied ? "Copied!" : "Copy for Arena")</button>
+            @if (Session.LigaMagicAvailable)
+            {
+                @* #62: players in Brazil price the real cards on Liga Magic. The list is copied
+                   and the page opened in their own browser; the app never reads its prices. *@
+                <button title="Copia a lista (sem terrenos básicos) e abre a Liga Magic no seu navegador para colar com Ctrl+V"
+                        @onclick="() => OnQuote.InvokeAsync(Shown)">@(QuoteStatus ?? "Cotar na Liga Magic")</button>
+            }
             @if (Deck.Deck.IsUserDeck)
             {
                 @* Fetched decks are replaced wholesale on every refresh, so editing one
@@ -89,6 +96,11 @@
 
     /// <summary>Copy for Arena, with the list as shown: without non-basic lands when excluded.</summary>
     [Parameter] public EventCallback<CandidateDeck> OnCopy { get; set; }
+    /// <summary>What the Liga Magic button says after it was used; null before.</summary>
+    [Parameter] public string? QuoteStatus { get; set; }
+
+    /// <summary>Quote on Liga Magic (#62), with the list as shown, like Copy for Arena.</summary>
+    [Parameter] public EventCallback<DeckAnalysisResult> OnQuote { get; set; }
     [Parameter] public EventCallback OnEdit { get; set; }
     [Parameter] public EventCallback OnRemove { get; set; }
 
