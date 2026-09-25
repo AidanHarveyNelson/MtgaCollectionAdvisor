@@ -49,7 +49,12 @@ jobs:
             -p:DebugType=None -p:Version="$VERSION" -o publish-out
           rm -f publish-out/appsettings.Development.json
 
-      - run: dotnet tool install -g vpk --version ${{ env.VPK_VERSION }}
+      # Global tools land in %USERPROFILE%\.dotnet\tools, which later steps' PATH lacks.
+      - name: Install vpk
+        shell: pwsh
+        run: |
+          dotnet tool install -g vpk --version ${{ env.VPK_VERSION }}
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       # Delta packages are built against the previous release; the first release has none.
       - name: Previous release
