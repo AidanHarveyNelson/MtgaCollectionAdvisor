@@ -24,8 +24,9 @@ public sealed class SchemaMigratorTests : IDisposable
 
     public void Dispose()
     {
-        SqliteConnection.ClearAllPools();
-        if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
+        if (!Directory.Exists(_directory)) return;
+        foreach (var file in Directory.GetFiles(_directory)) TestDatabaseFiles.Release(file);
+        Directory.Delete(_directory, recursive: true);
     }
 
     [Fact]
@@ -192,7 +193,7 @@ public sealed class SchemaMigratorTests : IDisposable
     {
         await SchemaMigrator.MigrateAsync(new Database(_databasePath));
         await ExecuteAsync($"PRAGMA user_version = {Migrations.Latest + 1}");
-        SqliteConnection.ClearAllPools();
+        TestDatabaseFiles.Release(_databasePath);
         var before = FileHash(_databasePath);
 
         var error = await Assert.ThrowsAsync<SchemaTooNewException>(
@@ -200,7 +201,7 @@ public sealed class SchemaMigratorTests : IDisposable
 
         Assert.Equal(Migrations.Latest + 1, error.DatabaseVersion);
         Assert.Equal(Migrations.Latest, error.LatestKnown);
-        SqliteConnection.ClearAllPools();
+        TestDatabaseFiles.Release(_databasePath);
         Assert.Equal(before, FileHash(_databasePath));
         Assert.Empty(Backups());
     }
@@ -231,7 +232,7 @@ public sealed class SchemaMigratorTests : IDisposable
             await command.ExecuteNonQueryAsync();
         }
 
-        SqliteConnection.ClearAllPools();
+        TestDatabaseFiles.Release(_databasePath);
     }
 
     private string[] Backups() => Directory.GetFiles(_directory, "advisor.db.backup-v*")
