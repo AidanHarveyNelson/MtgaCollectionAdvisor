@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 @inject AdvisorSession Session
+@inject AppUpdater Updater
 
 <div class="app">
     <header class="topbar">
@@ -103,12 +104,25 @@
             <span class="spinner" aria-hidden="true"></span>
         }
         <span>@Session.Status</span>
+
+        @if (Updater.ReadyVersion is { } ready)
+        {
+            <span class="update-ready">
+                Version @ready is ready.
+                <button disabled="@Session.IsBusy"
+                        title="@(Session.IsBusy ? "Available once the current operation finishes." : "Restarts the app on the new version. This window reloads by itself.")"
+                        @onclick="Updater.RestartToUpdate">
+                    Restart to update
+                </button>
+            </span>
+        }
     </div>
 
     @Body
 
     <footer class="footer">
         <span>By DasaX</span>
+        <span class="version" title="MTGA Deck Advisor version">v@(Updater.CurrentVersion)</span>
         <a href="https://github.com/Dasayeve/" target="_blank" rel="noopener" title="github.com/Dasayeve">
             <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
                 <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
@@ -132,9 +146,17 @@
     private bool _showImportDeck;
     private bool _showExport;
 
-    protected override void OnInitialized() => Session.Changed += OnSessionChanged;
+    protected override void OnInitialized()
+    {
+        Session.Changed += OnSessionChanged;
+        Updater.Changed += OnSessionChanged;
+    }
 
     private void OnSessionChanged() => InvokeAsync(StateHasChanged);
 
-    public void Dispose() => Session.Changed -= OnSessionChanged;
+    public void Dispose()
+    {
+        Session.Changed -= OnSessionChanged;
+        Updater.Changed -= OnSessionChanged;
+    }
 }

@@ -5,7 +5,37 @@
 Ranks MTG Arena decks by **how few wildcards you need to finish them**, based on the cards
 you actually own. Standard and Pioneer.
 
-## Run it
+## Install
+
+Windows only. Download `MtgaDeckAdvisor-win-Setup.exe` from the
+[latest release](https://github.com/Dasayeve/MtgaCollectionAdvisor/releases/latest) and run it.
+It installs for your user (no administrator rights) and adds a desktop and Start menu shortcut.
+No .NET install is needed.
+
+**Windows SmartScreen will warn about it.** The installer isn't code-signed yet, so Windows
+doesn't recognise it: choose **More info → Run anyway**. To check that the file is the one
+published here, compare its hash with `SHA256SUMS.txt` in the same release:
+
+```powershell
+Get-FileHash .\MtgaDeckAdvisor-win-Setup.exe -Algorithm SHA256
+```
+
+**Updates install themselves.** The app checks for a new version when it starts and downloads
+it in the background. Click **Restart to update** in the status bar, or just close the app and
+it will be on the new version next time.
+
+Your data lives in `%LOCALAPPDATA%\MtgaCollectionAdvisor\advisor.db` and is kept across
+updates and uninstalls. Delete that folder too to remove everything.
+
+A portable zip is also attached to each release, if you'd rather not install.
+
+Then, in the app:
+
+1. **Update cards**: downloads the Scryfall card database (once, ~30s).
+2. **Capture collection**: with MTG Arena open. Also runs automatically when the game starts.
+3. **Fetch decks**: pulls public lists for the selected format.
+
+## Build from source
 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and Windows.
 
@@ -13,21 +43,12 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and Windows.
 dotnet run --project src/MtgaCollectionAdvisor.Web
 ```
 
-It opens in a browser window and stores data in
-`%LOCALAPPDATA%\MtgaCollectionAdvisor\advisor.db`. No database server, no setup.
+It opens in a browser window and stores data in the same `advisor.db`. No database server,
+no setup.
 
-Then, in the app:
-
-1. **Update cards** — downloads the Scryfall card database (once, ~30s).
-2. **Capture collection** — with MTG Arena open. Also runs automatically when the game starts.
-3. **Fetch decks** — pulls public lists for the selected format.
-
-Standalone build:
-
-```bash
-dotnet publish src/MtgaCollectionAdvisor.Web -c Release -r win-x64 --self-contained \
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
-```
+Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed: it runs the
+tests, publishes a self-contained build, and packs it with [Velopack](https://velopack.io). How to cut
+a new version is in [RELEASING.md](RELEASING.md).
 
 ## How the collection is read
 

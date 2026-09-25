@@ -5,6 +5,11 @@ using MtgaCollectionAdvisor.Core.Export;
 using MtgaCollectionAdvisor.Core.Hosting;
 using MtgaCollectionAdvisor.Web.Components;
 using MtgaCollectionAdvisor.Web.Services;
+using Velopack;
+
+// First, before anything else runs: the installer starts the exe with hook arguments while it
+// installs, updates or uninstalls, and this handles them and exits.
+VelopackApp.Build().Run();
 
 const string InstanceMarker = "MtgaDeckAdvisor";
 
@@ -22,7 +27,11 @@ if (await IsAlreadyRunningAsync(appUrl))
     return;
 }
 
-var builder = WebApplication.CreateBuilder(args);
+// A published build carries its wwwroot next to the exe, but the content root defaults to the
+// working directory, which the installer's restart does not set: without this the page would
+// arrive with no CSS and no error. `dotnet run` has no wwwroot there and keeps the default.
+var publishedRoot = Directory.Exists(Path.Combine(AppContext.BaseDirectory, "wwwroot")) ? AppContext.BaseDirectory : null;
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = publishedRoot });
 
 builder.Logging.SetMinimumLevel(LogLevel.Warning);
 builder.WebHost.UseUrls(appUrl);
@@ -37,6 +46,7 @@ builder.Services.AddSingleton(AppConfig.Default with
     CreatorVideosEnabled = builder.Configuration.GetValue("Features:CreatorVideos", false)
 });
 builder.Services.AddSingleton<AdvisorSession>();
+builder.Services.AddSingleton<AppUpdater>();
 
 // The window is only a browser pointed at this server; these stop the server once it has
 // been closed, so nothing keeps watching MTG Arena with no window open.
@@ -70,7 +80,14 @@ if (openWindow)
     _ = Task.Run(() => LaunchUi(appUrl));
 }
 
+var updater = app.Services.GetRequiredService<AppUpdater>();
+_ = Task.Run(() => updater.CheckAndDownloadAsync(app.Lifetime.ApplicationStopping));
+
 app.Run();
+
+// The window was closed and the app stopped: an update the player did not restart for is
+// applied now, so the next start is the new version.
+updater.ApplyOnExitIfReady();
 
 static async Task<IResult> Download(
     AdvisorSession session, Func<DataExportService, CancellationToken, Task<ExportFile?>> write, CancellationToken ct)

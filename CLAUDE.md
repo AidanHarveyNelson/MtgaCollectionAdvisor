@@ -107,6 +107,31 @@ schema plus a row of each kind of user data) and list it in the fresh-versus-upg
 next to fetched ones (`archidekt:`). A migration may rebuild the cache tables (`cards`,
 fetched decks' sync state, creator videos) but must carry user rows across.
 
+## Releases
+
+**A release is a pushed `v*` tag**; `.github/workflows/release.yml` tests, publishes, packs
+with Velopack and uploads. On a PR that touches the workflow it is a dry run that publishes
+nothing. Add the schema fixture for the release (see above).
+
+**The Velopack `packId` must never be `MtgaCollectionAdvisor`.** Velopack installs to
+`%LOCALAPPDATA%\<packId>` and deletes that folder on uninstall; that name is the data
+folder, so uninstalling would delete the player's collection and decks. It is
+`MtgaDeckAdvisor`, and `ReleaseWorkflowTests` holds it there. The same test keeps `vpk` in
+the workflow at the `Velopack` package's version: move both together.
+
+**`VelopackApp.Build().Run()` stays the first statement of `Program.cs`**: the installer
+runs the exe with hook arguments and expects it to exit at once. `vpk pack` warns that it
+"does not look like your application's entry point": the top-level statements compile to an
+async `Main`, and the call sits in its state machine. It still runs first; install, update
+and uninstall were verified with it there. The published build pins
+its content root to the exe's folder, because the updater's restart does not set a working
+directory and the page would otherwise arrive with no CSS.
+
+Installing a release on the dev machine replaces the `MTGA Deck Advisor` desktop shortcut
+that `publish-local.ps1` makes, and uninstalling it removes that shortcut; run
+`publish-local.ps1` again afterwards. To try the update loop locally, pack under another
+`packId`, and point `MTGA_ADVISOR_UPDATE_SOURCE` at the local `Releases` folder.
+
 ## External data
 
 **Escape `LIKE` wildcards when the search term comes from the user.** An unescaped `%`

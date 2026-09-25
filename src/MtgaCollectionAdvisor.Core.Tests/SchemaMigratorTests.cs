@@ -66,10 +66,12 @@ public sealed class SchemaMigratorTests : IDisposable
         Assert.Empty(Backups());
     }
 
-    [Fact]
-    public async Task MigrateAsync_Should_KeepUserData_When_UpgradingPreVersioningDatabase()
+    [Theory]
+    [InlineData("schema-v0.sql")]
+    [InlineData("schema-v2.sql")]
+    public async Task MigrateAsync_Should_KeepUserData_When_Upgrading(string fixture)
     {
-        await CreateFromFixtureAsync("schema-v0.sql");
+        await CreateFromFixtureAsync(fixture);
 
         await SchemaMigrator.MigrateAsync(new Database(_databasePath));
 
@@ -105,6 +107,7 @@ public sealed class SchemaMigratorTests : IDisposable
 
     [Theory]
     [InlineData("schema-v0.sql")]
+    [InlineData("schema-v2.sql")]
     public async Task MigrateAsync_Should_ProduceSameSchema_As_FreshDatabase(string fixture)
     {
         var freshPath = Path.Combine(_directory, "fresh.db");
