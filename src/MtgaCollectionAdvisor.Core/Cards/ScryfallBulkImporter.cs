@@ -69,13 +69,16 @@ public sealed class ScryfallBulkImporter(HttpClient httpClient)
                 StandardLegal: card.IsLegal("standard"),
                 PioneerLegal: card.IsLegal("pioneer"),
                 ImageUrl: image,
-                BackImageUrl: backImage);
+                BackImageUrl: backImage,
+                IsNonBasicLand: card.IsNonBasicLand());
         }
     }
 
     private static CardRarity MapRarity(ScryfallCard card)
     {
-        if (card.TypeLine.Contains("Basic Land", StringComparison.OrdinalIgnoreCase)) return CardRarity.Basic;
+        // By the "Basic" supertype, not the text "Basic Land": that missed "Basic Snow Land",
+        // which then cost a common wildcard.
+        if (card.IsBasicLand()) return CardRarity.Basic;
         return card.Rarity switch
         {
             "common" => CardRarity.Common,

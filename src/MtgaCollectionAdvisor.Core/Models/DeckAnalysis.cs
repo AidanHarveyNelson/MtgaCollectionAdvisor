@@ -14,7 +14,8 @@ public sealed record CardGap(
     int? GrpId,
     CardRarity Rarity,
     string? ImageUrl = null,
-    string? BackImageUrl = null)
+    string? BackImageUrl = null,
+    bool IsNonBasicLand = false)
 {
     public int Missing => Math.Max(0, Needed - Owned);
     public bool AvailableOnArena => GrpId is not null;
@@ -72,4 +73,39 @@ public sealed record DeckAnalysisResult(
     /// deck may well contain cards that rotated out years ago.
     /// </summary>
     public bool LegalInFormat => IllegalInFormat.Count == 0;
+
+    public bool HasNonBasicLands => Gaps.Any(g => g.IsNonBasicLand);
+
+    /// <summary>
+    /// The same deck without its non-basic lands (#61), for pricing a deck before its mana base,
+    /// which is often most of its rare wildcards. Cost and owned totals are recomputed the way
+    /// WildcardCalculator computes them, and the deck's own list loses those cards too, so what
+    /// is shown and what is exported agree.
+    /// </summary>
+    public DeckAnalysisResult WithoutNonBasicLands()
+    {
+        if (!HasNonBasicLands) return this;
+
+        var excluded = Gaps.Where(g => g.IsNonBasicLand).Select(g => g.CardName).ToHashSet(StringComparer.Ordinal);
+        var gaps = Gaps.Where(g => !g.IsNonBasicLand).ToList();
+
+        return this with
+        {
+            Deck = Deck with { Cards = [.. Deck.Cards.Where(c => !excluded.Contains(c.Name))] },
+            Gaps = gaps,
+            Needed = gaps.Where(g => g.Rarity != CardRarity.Basic)
+                .Aggregate(WildcardNeed.Zero, (sum, g) => sum.Add(WildcardNeed.FromGap(g))),
+            OwnedCopies = gaps.Sum(g => Math.Min(g.Owned, g.Needed)),
+            TotalCopies = gaps.Sum(g => g.Needed),
+            UnavailableOnArena = [.. UnavailableOnArena.Where(n => !excluded.Contains(n))],
+            IllegalInFormat = [.. IllegalInFormat.Where(n => !excluded.Contains(n))],
+        };
+    }
+
+    /// <summary>How many copies the non-basic lands are, and the wildcards they still cost.</summary>
+    public (int Copies, WildcardNeed Cost) NonBasicLandShare()
+    {
+        var lands = Gaps.Where(g => g.IsNonBasicLand).ToList();
+        return (lands.Sum(g => g.Needed), lands.Aggregate(WildcardNeed.Zero, (sum, g) => sum.Add(WildcardNeed.FromGap(g))));
+    }
 }
