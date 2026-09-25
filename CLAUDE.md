@@ -197,6 +197,12 @@ face instead. `*.scryfall.io` has no rate limit, while `api.scryfall.com` does (
 build image URLs through the API per card. Scryfall's rules: show the whole card, scaled
 proportionally, never cropped, filtered or covered (the artist and copyright lines stay).
 
+**Land kinds come from the front face's type line, by whole-word supertype** (#61). Basic
+means the "Basic" supertype on a Land: matching the text "Basic Land" missed "Basic Snow Land",
+and snow-covered basics were priced as commons. A non-basic land is a Land without it; spells
+with a land on their back are not lands for this. `ScryfallCard.IsBasicLandType` and
+`IsNonBasicLandType` are the only place this is decided.
+
 Deck sites let anyone file any list under any format, so fetched decks must be checked for
 format legality rather than trusted. Scryfall's bulk data lists a few `arena_id` values more
 than once, so dedupe before inserting against a primary key.
