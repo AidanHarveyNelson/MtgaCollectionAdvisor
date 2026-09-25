@@ -34,12 +34,18 @@ else
                 </div>
                 <div class="stat">
                     <span class="stat-label">Wildcards</span>
-                    <span class="stat-value wildcard-row">
-                        <span class="wildcard common" title="Common">@Session.Collection.Wildcards.Commons</span>
-                        <span class="wildcard uncommon" title="Uncommon">@Session.Collection.Wildcards.Uncommons</span>
-                        <span class="wildcard rare" title="Rare">@Session.Collection.Wildcards.Rares</span>
-                        <span class="wildcard mythic" title="Mythic">@Session.Collection.Wildcards.Mythics</span>
+                    @* Never read is not zero (#57): unknown totals show as "—", with what to do. *@
+                    @{ var wallet = Session.Collection.Wildcards; }
+                    <span class="stat-value wildcard-row" title="@Session.WildcardHint">
+                        <span class="wildcard common" title="Common">@(wallet?.Commons.ToString() ?? "—")</span>
+                        <span class="wildcard uncommon" title="Uncommon">@(wallet?.Uncommons.ToString() ?? "—")</span>
+                        <span class="wildcard rare" title="Rare">@(wallet?.Rares.ToString() ?? "—")</span>
+                        <span class="wildcard mythic" title="Mythic">@(wallet?.Mythics.ToString() ?? "—")</span>
                     </span>
+                    @if (Session.WildcardHint is { } hint)
+                    {
+                        <span class="wildcard-unknown" title="@hint">not read yet · why?</span>
+                    }
                 </div>
             </div>
 

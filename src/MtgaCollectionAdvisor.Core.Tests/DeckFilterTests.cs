@@ -126,6 +126,19 @@ public class DeckFilterTests
         Assert.Equal("Affordable", result[0].Deck.Name);
     }
 
+    // #57: wildcards never read can't say what is craftable; the filter keeps every deck
+    // rather than claiming none can be built.
+    [Fact]
+    public void Apply_Should_SkipCraftableOnly_When_WalletUnknown()
+    {
+        var affordable = Deck("Affordable", "R", ["Mountain"], rares: 2);
+        var tooExpensive = Deck("Too Expensive", "R", ["Mountain"], rares: 9);
+
+        var result = DeckFilter.Apply([affordable, tooExpensive], new DeckFilterCriteria { OnlyCraftable = true }, wallet: null);
+
+        Assert.Equal(2, result.Count);
+    }
+
     [Fact]
     public void Apply_Should_DropUnplayableDecks_When_IncludeUnplayableIsFalse()
     {

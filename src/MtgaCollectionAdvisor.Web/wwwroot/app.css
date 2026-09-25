@@ -128,6 +128,9 @@ input[type="text"], input[type="number"], select {
 .stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .wildcard-row { display: flex; gap: var(--space-3); font-variant-numeric: tabular-nums; }
+
+/* #57: wildcards never read; the tooltip says what to do in MTG Arena. */
+.wildcard-unknown { font-size: 11px; color: var(--warning); cursor: help; text-decoration: underline dotted; }
 .wildcard, .wc-part { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
 
 /* The same diamond marks a wildcard total in the topbar and a wildcard count in a deck
@@ -477,6 +480,7 @@ input[type="range"] { accent-color: var(--accent); }
 
 .badge.yes { background: var(--positive-soft); color: var(--positive); border-color: rgba(78, 194, 122, 0.4); }
 .badge.no { background: rgba(227, 93, 93, 0.12); color: var(--negative); border-color: rgba(227, 93, 93, 0.35); }
+.badge.unknown { background: transparent; color: var(--text-faint); border-color: var(--border-strong); cursor: help; }
 
 .colors { display: inline-flex; gap: 2px; align-items: center; }
 .colors .ms { font-size: 15px; }

@@ -108,7 +108,9 @@ public sealed class CollectionStore(Database database)
             }
         }
 
-        var wildcards = WildcardInventory.Empty;
+        // No row means the wildcards were never read (Detailed Logs off, or no login seen yet),
+        // which is not the same as having none (#57).
+        WildcardInventory? wildcards = null;
         await using (var command = connection.CreateCommand())
         {
             command.CommandText = "SELECT commons, uncommons, rares, mythics, synced_at FROM wildcard_inventory WHERE id = 1";

@@ -38,6 +38,17 @@ public class CreatorVideoFilterTests
         Assert.Equal("cheap", Assert.Single(result).Video.VideoId);
     }
 
+    // #57: unknown wildcards filter nothing rather than everything.
+    [Fact]
+    public void Apply_Should_SkipCraftableOnly_When_WalletUnknown()
+    {
+        var cards = new[] { Card("cheap", rares: 3), Card("dear", rares: 9) };
+
+        var result = CreatorVideoFilter.Apply(cards, new CreatorVideoFilterCriteria { OnlyCraftable = true }, wallet: null);
+
+        Assert.Equal(2, result.Count);
+    }
+
     [Fact]
     public void Apply_Should_KeepOnlyAppFormats()
     {

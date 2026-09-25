@@ -66,8 +66,9 @@
 
         <div class="filter-group">
             <div class="filter-title">Craftability</div>
-            <label class="checkbox-row">
-                <input type="checkbox" checked="@_onlyCraftable"
+            @* Unknown wildcards (#57) can't decide what is craftable: the option waits for them. *@
+            <label class="checkbox-row" title="@Session.WildcardHint">
+                <input type="checkbox" checked="@_onlyCraftable" disabled="@(Session.Collection.Wildcards is null)"
                        @onchange="e => _onlyCraftable = (bool)e.Value!" />
                 <span>Only what I can craft now</span>
             </label>
@@ -283,7 +284,11 @@
                                     </div>
                                 </td>
                                 <td>
-                                    @if (deck.Needed.IsAffordableWith(Session.Collection.Wildcards))
+                                    @if (Session.Collection.Wildcards is not { } wallet)
+                                    {
+                                        <span class="badge unknown" title="@Session.WildcardHint">?</span>
+                                    }
+                                    else if (deck.Needed.IsAffordableWith(wallet))
                                     {
                                         <span class="badge yes">yes</span>
                                     }
