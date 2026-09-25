@@ -17,10 +17,12 @@
   </PropertyGroup>
 
   <!-- A console app gets a terminal window next to its own, and closing that window kills the
-       server. Release (what players and publish-local run) is a Windows app with no console;
-       Debug keeps it for development. -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <OutputType>WinExe</OutputType>
+       server, so the release workflow builds without one (-p:WindowsAppNoConsole=true).
+       OutputType must stay Exe: Blazor's framework files (blazor.web.js) are only added to
+       Exe projects, and a WinExe build loads with no button working and no error (#54).
+       This is the flag the SDK itself sets for WinExe to make the app host a GUI program. -->
+  <PropertyGroup Condition="'$(WindowsAppNoConsole)' == 'true'">
+    <_UseWindowsGraphicalUserInterface>true</_UseWindowsGraphicalUserInterface>
   </PropertyGroup>
 
 </Project>
