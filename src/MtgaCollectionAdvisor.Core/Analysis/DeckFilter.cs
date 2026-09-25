@@ -110,7 +110,7 @@ public static class DeckFilter
     public static IReadOnlyList<DeckAnalysisResult> Apply(
         IEnumerable<DeckAnalysisResult> decks,
         DeckFilterCriteria criteria,
-        WildcardInventory wallet)
+        WildcardInventory? wallet)
     {
         IEnumerable<DeckAnalysisResult> query = decks;
 
@@ -136,7 +136,9 @@ public static class DeckFilter
                 : query.Where(d => criteria.Colors.All(c => d.Colors.Contains(c)));
         }
 
-        if (criteria.OnlyCraftable)
+        // Unknown wildcards (#57) can't say what is craftable; the option is disabled in the UI,
+        // and here it filters nothing rather than everything.
+        if (criteria.OnlyCraftable && wallet is not null)
         {
             query = query.Where(d => d.Needed.IsAffordableWith(wallet));
         }

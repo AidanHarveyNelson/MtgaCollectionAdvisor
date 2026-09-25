@@ -44,7 +44,7 @@ public static class CreatorVideoFilter
     public static IReadOnlyList<CreatorVideoCard> Apply(
         IEnumerable<CreatorVideoCard> cards,
         CreatorVideoFilterCriteria criteria,
-        WildcardInventory wallet)
+        WildcardInventory? wallet)
     {
         var query = cards;
 
@@ -63,7 +63,8 @@ public static class CreatorVideoFilter
             query = query.Where(c => c.Analysis is not null);
         }
 
-        if (criteria.OnlyCraftable)
+        // Unknown wildcards (#57): filter nothing rather than everything; the UI disables it.
+        if (criteria.OnlyCraftable && wallet is not null)
         {
             query = query.Where(c => c.Analysis?.Needed.IsAffordableWith(wallet) == true);
         }

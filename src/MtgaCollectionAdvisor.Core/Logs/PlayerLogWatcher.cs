@@ -32,6 +32,11 @@ public sealed class PlayerLogWatcher : IDisposable
     /// <summary>The decks saved in Arena, raised at each login Arena logs.</summary>
     public event Action<IReadOnlyList<ArenaDeck>>? ArenaDecksUpdated;
 
+    /// <summary>Whether MTG Arena's Detailed Logs option is on, each time a session's log says so (#57).</summary>
+    public event Action<bool>? DetailedLogsReported;
+
+    public bool LogExists => File.Exists(_path);
+
     public PlayerLogWatcher(string? path = null, TimeSpan? pollInterval = null)
     {
         _path = path ?? PlayerLogPaths.DefaultPath;
@@ -72,6 +77,13 @@ public sealed class PlayerLogWatcher : IDisposable
             string? line;
             while ((line = reader.ReadLine()) != null)
             {
+                // A plain line, not JSON: checked before the event parser, which skips it.
+                if (DetailedLogsLine.Parse(line) is { } detailedLogs)
+                {
+                    DetailedLogsReported?.Invoke(detailedLogs);
+                    continue;
+                }
+
                 LogEvent? evt;
                 try
                 {

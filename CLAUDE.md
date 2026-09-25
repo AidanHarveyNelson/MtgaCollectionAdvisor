@@ -30,6 +30,11 @@ login, so it is stored (`arena_decks`) rather than re-read. Two traps when turni
 Arena names Pioneer **Explorer** (the two are unified; decks may carry either name), and it lists a companion in `Companions` *and* in
 `Sideboard`, so read the sideboard only (`ArenaDeckImport`).
 
+**Wildcard totals and saved decks are only in `Player.log` with MTG Arena's "Detailed Logs
+(Plugin Support)" on** (Options → Account). The log says which with a plain line near the top
+of each session, `DETAILED LOGS: ENABLED` or `DISABLED` (`DetailedLogsLine`). Wildcards never
+read are **unknown (`null`), never zero** (#57): zero made every deck look uncraftable.
+
 Two traps in the scanner, both fixed and both easy to reintroduce:
 
 - **Chunked reads must overlap.** A collection table straddling a chunk boundary gets split,

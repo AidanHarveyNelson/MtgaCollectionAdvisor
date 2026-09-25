@@ -15,12 +15,12 @@ public sealed record WildcardInventory(
 /// </summary>
 public sealed record CollectionSnapshot(
     IReadOnlyDictionary<int, int> OwnedByGrpId,
-    WildcardInventory Wildcards,
+    WildcardInventory? Wildcards,      // null = never read (#57): unknown, not zero
     DateTimeOffset SyncedAt)
 {
     public static readonly CollectionSnapshot Empty = new(
         new Dictionary<int, int>(),
-        WildcardInventory.Empty,
+        null,
         DateTimeOffset.MinValue);
 
     public int OwnedQuantity(int grpId) => OwnedByGrpId.TryGetValue(grpId, out var qty) ? qty : 0;

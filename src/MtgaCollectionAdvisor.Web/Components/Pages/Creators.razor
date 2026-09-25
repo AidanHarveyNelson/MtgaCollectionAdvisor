@@ -61,8 +61,9 @@
                 <input type="checkbox" checked="@_onlyWithDeck" @onchange="e => _onlyWithDeck = (bool)e.Value!" />
                 <span>Deck read automatically</span>
             </label>
-            <label class="checkbox-row">
-                <input type="checkbox" checked="@_onlyCraftable" @onchange="e => _onlyCraftable = (bool)e.Value!" />
+            <label class="checkbox-row" title="@Session.WildcardHint">
+                <input type="checkbox" checked="@_onlyCraftable" disabled="@(Session.Collection.Wildcards is null)"
+                       @onchange="e => _onlyCraftable = (bool)e.Value!" />
                 <span>Craftable now</span>
             </label>
             <label class="checkbox-row">
@@ -130,7 +131,7 @@
                                         Other format
                                     </span>
                                 }
-                                @if (deck.Needed.IsAffordableWith(Session.Collection.Wildcards))
+                                @if (Session.Collection.Wildcards is { } wallet && deck.Needed.IsAffordableWith(wallet))
                                 {
                                     <span class="badge yes">craftable</span>
                                 }

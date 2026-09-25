@@ -53,6 +53,7 @@ public sealed partial class AdvisorSession(AppConfig config) : IAsyncDisposable
 
         CardsUpdatedAt = await services.CardDatabaseStore.GetLastImportedAsync();
         services.PlayerLogWatcher.InventoryUpdated += OnWildcardsUpdated;
+        services.PlayerLogWatcher.DetailedLogsReported += OnDetailedLogsReported;
         services.PlayerLogWatcher.ArenaDecksUpdated += OnArenaDecksUpdated;
         ArenaDecksCapturedAt = (await services.ArenaDeckStore.LoadAsync())?.CapturedAt;
         services.PlayerLogWatcher.Start();
@@ -461,6 +462,22 @@ public sealed partial class AdvisorSession(AppConfig config) : IAsyncDisposable
             ArenaDecksCapturedAt = capturedAt;
             Notify();
         });
+    }
+
+    /// <summary>What Player.log last said about MTG Arena's Detailed Logs option (#57).</summary>
+    public DetailedLogs DetailedLogs { get; private set; }
+
+    /// <summary>
+    /// Why the wildcards are unknown and what to do about it; null once they are read. The
+    /// top bar, the craftable column and the craftable filters show it instead of zeros.
+    /// </summary>
+    public string? WildcardHint => WildcardStatus.Hint(
+        Collection.Wildcards is not null, DetailedLogs, services?.PlayerLogWatcher.LogExists == true);
+
+    private void OnDetailedLogsReported(bool enabled)
+    {
+        DetailedLogs = enabled ? DetailedLogs.Enabled : DetailedLogs.Disabled;
+        Notify();
     }
 
     private void OnWildcardsUpdated(WildcardInventory inventory)

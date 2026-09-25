@@ -51,11 +51,12 @@ public static class CollectionExportWriter
         return sb.ToString();
     }
 
-    public static string WriteJson(IReadOnlyList<ExportedCard> cards, WildcardInventory wildcards, DateTimeOffset exportedAt) =>
+    // Unknown wildcards (#57) are written as null, never as zeros the player doesn't have.
+    public static string WriteJson(IReadOnlyList<ExportedCard> cards, WildcardInventory? wildcards, DateTimeOffset exportedAt) =>
         JsonSerializer.Serialize(new CollectionFile
         {
             ExportedAt = exportedAt,
-            Wildcards = new WildcardsEntry
+            Wildcards = wildcards is null ? null : new WildcardsEntry
             {
                 Common = wildcards.Commons,
                 Uncommon = wildcards.Uncommons,
@@ -70,7 +71,7 @@ public static class CollectionExportWriter
     private sealed class CollectionFile
     {
         [JsonPropertyName("exported_at")] public DateTimeOffset ExportedAt { get; init; }
-        [JsonPropertyName("wildcards")] public WildcardsEntry Wildcards { get; init; } = new();
+        [JsonPropertyName("wildcards")] public WildcardsEntry? Wildcards { get; init; }
         [JsonPropertyName("cards")] public List<CardEntry> Cards { get; init; } = [];
     }
 

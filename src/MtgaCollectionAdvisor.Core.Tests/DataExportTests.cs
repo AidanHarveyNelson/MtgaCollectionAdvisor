@@ -99,6 +99,26 @@ public sealed class DataExportTests : IAsyncLifetime
     }
 
     [Fact]
+    public void WriteJson_Should_WriteNull_When_WildcardsUnknown()
+    {
+        var json = CollectionExportWriter.WriteJson([], wildcards: null, DateTimeOffset.UtcNow);
+
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, JsonDocument.Parse(json).RootElement.GetProperty("wildcards").ValueKind);
+    }
+
+    // #57: no row means never read, not zero; a saved inventory comes back as saved.
+    [Fact]
+    public async Task CollectionStore_Should_ReturnNullWildcards_When_NeverSaved()
+    {
+        var store = new CollectionStore(_database);
+        Assert.Null((await store.LoadAsync()).Wildcards);
+
+        await store.SaveWildcardsAsync(new WildcardInventory(3, 2, 1, 0));
+
+        Assert.Equal(new WildcardInventory(3, 2, 1, 0), (await store.LoadAsync()).Wildcards);
+    }
+
+    [Fact]
     public void WriteJson_Should_IncludeWildcards()
     {
         var json = CollectionExportWriter.WriteJson([], new WildcardInventory(120, 64, 6, 11), DateTimeOffset.UtcNow);
