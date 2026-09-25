@@ -114,6 +114,12 @@ existing database, which is why this exists.
 When a version is released, add `Core.Tests/Fixtures/schema-v{N}.sql` (that version's
 schema plus a row of each kind of user data) and list it in the fresh-versus-upgraded test.
 
+**A migration adds columns; it does not fill them.** When the data comes from an import
+(Scryfall, Archidekt), an upgraded player gets the new feature empty and nothing says why. #59
+shipped image URLs that way until the app learned to re-import once by itself when the column
+is empty everywhere (`CardDatabaseStore.NeedsImageBackfill`). Plan that trigger with the
+migration.
+
 `decks` and `deck_cards` are **not** cache: they hold the user's own decks (`manual:` ids)
 next to fetched ones (`archidekt:`). A migration may rebuild the cache tables (`cards`,
 fetched decks' sync state, creator videos) but must carry user rows across.
