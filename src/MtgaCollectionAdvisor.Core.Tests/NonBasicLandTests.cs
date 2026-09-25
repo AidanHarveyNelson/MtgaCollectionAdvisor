@@ -40,6 +40,28 @@ public sealed class NonBasicLandTests
         Assert.False(ScryfallCard.IsNonBasicLandType(typeLine));
     }
 
+    // Snow-covered basics and Wastes are basic (maintainer's call): no wildcard, and never
+    // counted among the non-basic lands.
+    [Theory]
+    [InlineData("Basic Land — Island")]
+    [InlineData("Basic Snow Land — Island")]
+    [InlineData("Basic Land")]
+    public void IsBasicLandType_Should_BeTrue_ForEveryBasic(string typeLine)
+    {
+        Assert.True(ScryfallCard.IsBasicLandType(typeLine));
+        Assert.False(ScryfallCard.IsNonBasicLandType(typeLine));
+    }
+
+    [Theory]
+    [InlineData("Land — Mountain Forest")]
+    [InlineData("Snow Land")]
+    [InlineData("Creature — Elf")]
+    [InlineData(null)]
+    public void IsBasicLandType_Should_BeFalse_ForEverythingElse(string? typeLine)
+    {
+        Assert.False(ScryfallCard.IsBasicLandType(typeLine));
+    }
+
     [Fact]
     public void IsNonBasicLand_Should_UseTheFrontFace()
     {

@@ -85,17 +85,28 @@ internal sealed class ScryfallCard
     /// face decides, so a spell with a land on its back, or a creature that transforms into a
     /// land, is not one: it is played, and crafted, as the spell.
     /// </summary>
-    public bool IsNonBasicLand() =>
-        IsNonBasicLandType(CardFaces is { Count: > 0 } faces && faces[0].TypeLine is { } front ? front : TypeLine.Split(" // ")[0]);
+    public bool IsNonBasicLand() => IsNonBasicLandType(FrontTypeLine);
 
-    // Only the types before the dash count ("Land Creature — Forest Dryad"), and "Land" as a
-    // whole word, so a subtype that merely contains the letters does not match.
-    internal static bool IsNonBasicLandType(string? typeLine)
-    {
-        if (string.IsNullOrWhiteSpace(typeLine)) return false;
-        var types = typeLine.Split('—')[0];
-        return LandWord.IsMatch(types) && !BasicWord.IsMatch(types);
-    }
+    /// <summary>
+    /// A basic land costs no wildcard. The "Basic" supertype decides, so the snow-covered basics
+    /// ("Basic Snow Land — Island") and Wastes are basic too, as the maintainer wants them
+    /// treated, not priced as the commons Scryfall prints them as.
+    /// </summary>
+    public bool IsBasicLand() => IsBasicLandType(FrontTypeLine);
+
+    private string FrontTypeLine =>
+        CardFaces is { Count: > 0 } faces && faces[0].TypeLine is { } front ? front : TypeLine.Split(" // ")[0];
+
+    // Only the types before the dash count ("Land Creature — Forest Dryad"), and each as a whole
+    // word, so a subtype that merely contains the letters does not match.
+    internal static bool IsNonBasicLandType(string? typeLine) =>
+        Types(typeLine) is { } types && LandWord.IsMatch(types) && !BasicWord.IsMatch(types);
+
+    internal static bool IsBasicLandType(string? typeLine) =>
+        Types(typeLine) is { } types && LandWord.IsMatch(types) && BasicWord.IsMatch(types);
+
+    private static string? Types(string? typeLine) =>
+        string.IsNullOrWhiteSpace(typeLine) ? null : typeLine.Split('—')[0];
 
     private static readonly Regex LandWord = new(@"\bLand\b", RegexOptions.Compiled);
     private static readonly Regex BasicWord = new(@"\bBasic\b", RegexOptions.Compiled);
