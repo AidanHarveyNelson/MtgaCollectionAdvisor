@@ -5,8 +5,10 @@ using MtgaCollectionAdvisor.Core.Configuration;
 using MtgaCollectionAdvisor.Core.Creators;
 using MtgaCollectionAdvisor.Core.Decks;
 using MtgaCollectionAdvisor.Core.Export;
+using MtgaCollectionAdvisor.Core.Hosting;
 using MtgaCollectionAdvisor.Core.Memory;
 using MtgaCollectionAdvisor.Core.Models;
+using MtgaCollectionAdvisor.Core.Storage;
 
 namespace MtgaCollectionAdvisor.Web.Services;
 
@@ -15,7 +17,7 @@ namespace MtgaCollectionAdvisor.Web.Services;
 /// deck fetch, card database import). Components subscribe to <see cref="Changed"/>
 /// and re-render; nothing in the UI ever blocks on a scan.
 /// </summary>
-public sealed partial class AdvisorSession(AppConfig config) : IAsyncDisposable
+public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSession> log) : IAsyncDisposable
 {
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private System.Threading.Timer? _mtgaWatchTimer;
@@ -45,6 +47,7 @@ public sealed partial class AdvisorSession(AppConfig config) : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            log.LogError(ex, "Could not open the local database");
             StartupError = $"Could not open the local database: {ex.Message}";
             Status = StartupError;
             Notify();
@@ -54,6 +57,7 @@ public sealed partial class AdvisorSession(AppConfig config) : IAsyncDisposable
         CardsUpdatedAt = await services.CardDatabaseStore.GetLastImportedAsync();
         services.PlayerLogWatcher.InventoryUpdated += OnWildcardsUpdated;
         services.PlayerLogWatcher.DetailedLogsReported += OnDetailedLogsReported;
+        services.PlayerLogWatcher.WatchError += ex => log.LogWarning(ex, "Reading Player.log failed");
         services.PlayerLogWatcher.ArenaDecksUpdated += OnArenaDecksUpdated;
         ArenaDecksCapturedAt = (await services.ArenaDeckStore.LoadAsync())?.CapturedAt;
         services.PlayerLogWatcher.Start();
@@ -514,6 +518,8 @@ public sealed partial class AdvisorSession(AppConfig config) : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            // Shown in the status bar, and kept in the log file (#52) for when a player reports it.
+            log.LogError(ex, "{Operation} failed", operation);
             Status = $"{operation} failed: {ex.Message}";
         }
         finally
@@ -526,6 +532,18 @@ public sealed partial class AdvisorSession(AppConfig config) : IAsyncDisposable
     }
 
     private void Notify() => Changed?.Invoke();
+
+    /// <summary>The folder with the app's log files (#52), next to the database.</summary>
+    public string LogFolder => LogFiles.FolderFor(services?.Database.FilePath
+        ?? Database.CreateDefault(config.DatabasePathOverride).FilePath);
+
+    /// <summary>Opens the log folder in Explorer; the app runs locally, as the player.</summary>
+    public void OpenLogFolder()
+    {
+        var folder = LogFolder;
+        Directory.CreateDirectory(folder);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true });
+    }
 
     /// <summary>
     /// Reports on the calling thread. <see cref="Progress{T}"/> posts each report for later,

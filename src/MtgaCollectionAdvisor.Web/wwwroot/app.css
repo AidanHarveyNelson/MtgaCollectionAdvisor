@@ -770,6 +770,17 @@ input[type="range"] { accent-color: var(--accent); }
 
 .footer a:hover { color: var(--accent); }
 
+.footer .log-link {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--text-faint);
+    font-size: 12px;
+    text-decoration: underline dotted;
+}
+
+.footer .log-link:hover:not(:disabled) { background: none; color: var(--accent); }
+
 /* A downloaded update waiting for a restart, at the far end of the status bar. */
 .statusbar .update-ready {
     margin-left: auto;

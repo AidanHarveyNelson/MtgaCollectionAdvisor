@@ -159,6 +159,12 @@ with it, delete `bin/Release` and `obj/Release` before building without it. The 
 workflow smoke-tests the published app (`blazor.web.js` must return 200) before packing.
 Nothing the app logs is visible without a console; the log file is the place to look (#52).
 
+**The log file is `logs\advisor-YYYY-MM-DD.log` next to the database** (#52): warnings, errors,
+and three startup lines (version, content root, database). A week is kept, and 5 MB per day at
+most. A test run with `MTGA_ADVISOR_DB_PATH` writes its own logs beside that file, never into
+the player's. Errors the app shows in the status bar or a setup step are logged with their
+exception; keep it that way when adding operations, and never log the collection or decks.
+
 Installing a release on the dev machine replaces the `MTGA Deck Advisor` desktop shortcut
 that `publish-local.ps1` makes, and uninstalling it removes that shortcut; run
 `publish-local.ps1` again afterwards. To try the update loop locally, pack under another

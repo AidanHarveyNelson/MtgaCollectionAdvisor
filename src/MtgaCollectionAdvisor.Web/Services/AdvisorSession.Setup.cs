@@ -155,6 +155,7 @@ public sealed partial class AdvisorSession
         }
         catch (Exception ex)
         {
+            log.LogWarning(ex, "Setup step {Step} failed", step);
             Fail(step, $"{SetupStepLabel(step)} failed: {ex.Message}");
         }
     }
@@ -238,6 +239,7 @@ public sealed partial class AdvisorSession
         }
         catch (Exception ex)
         {
+            log.LogWarning(ex, "Setup collection capture failed");
             found = false;
             _setupMessage = $"Capturing the collection failed: {ex.Message}";
         }
