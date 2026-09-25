@@ -120,7 +120,10 @@ folder, so uninstalling would delete the player's collection and decks. It is
 the workflow at the `Velopack` package's version: move both together.
 
 **`VelopackApp.Build().Run()` stays the first statement of `Program.cs`**: the installer
-runs the exe with hook arguments and expects it to exit at once. The published build pins
+runs the exe with hook arguments and expects it to exit at once. `vpk pack` warns that it
+"does not look like your application's entry point": the top-level statements compile to an
+async `Main`, and the call sits in its state machine. It still runs first; install, update
+and uninstall were verified with it there. The published build pins
 its content root to the exe's folder, because the updater's restart does not set a working
 directory and the page would otherwise arrive with no CSS.
 
