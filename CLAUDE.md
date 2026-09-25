@@ -127,6 +127,10 @@ and uninstall were verified with it there. The published build pins
 its content root to the exe's folder, because the updater's restart does not set a working
 directory and the page would otherwise arrive with no CSS.
 
+**Release builds are Windows apps (`WinExe`) with no console** (#51); Debug keeps one. A
+console app gets a terminal next to its window, and closing it kills the server. Nothing
+the app logs is visible in a Release build, so the log file is the place to look (#52).
+
 Installing a release on the dev machine replaces the `MTGA Deck Advisor` desktop shortcut
 that `publish-local.ps1` makes, and uninstalling it removes that shortcut; run
 `publish-local.ps1` again afterwards. To try the update loop locally, pack under another

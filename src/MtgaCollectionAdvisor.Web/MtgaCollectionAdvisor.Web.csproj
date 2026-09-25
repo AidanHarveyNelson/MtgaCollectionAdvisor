@@ -16,4 +16,11 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <!-- A console app gets a terminal window next to its own, and closing that window kills the
+       server. Release (what players and publish-local run) is a Windows app with no console;
+       Debug keeps it for development. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <OutputType>WinExe</OutputType>
+  </PropertyGroup>
+
 </Project>
