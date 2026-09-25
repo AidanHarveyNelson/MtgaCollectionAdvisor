@@ -185,6 +185,12 @@ too often** — during #32, bulk probing got every feed refused for hours, for t
 Treat a failed feed as "no news", never "no videos", and keep to `CreatorFeedSchedule`. Do
 not bulk-probe feeds while testing.
 
+**Card images come from Scryfall's image CDN, by URLs stored at import** (#59). The bulk
+file already carries `image_uris`; a double-faced card has none at the top level and one per
+face instead. `*.scryfall.io` has no rate limit, while `api.scryfall.com` does (10/s), so never
+build image URLs through the API per card. Scryfall's rules: show the whole card, scaled
+proportionally, never cropped, filtered or covered (the artist and copyright lines stay).
+
 Deck sites let anyone file any list under any format, so fetched decks must be checked for
 format legality rather than trusted. Scryfall's bulk data lists a few `arena_id` values more
 than once, so dedupe before inserting against a primary key.

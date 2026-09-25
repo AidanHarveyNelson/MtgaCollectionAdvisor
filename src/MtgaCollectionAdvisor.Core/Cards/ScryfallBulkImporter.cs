@@ -58,6 +58,7 @@ public sealed class ScryfallBulkImporter(HttpClient httpClient)
 
             if (card is null || card.ArenaId is null) continue;
 
+            var (image, backImage) = card.NormalImageUrls();
             yield return new CardInfo(
                 GrpId: card.ArenaId.Value,
                 Name: card.Name,
@@ -66,7 +67,9 @@ public sealed class ScryfallBulkImporter(HttpClient httpClient)
                 Colors: card.EffectiveColors(),
                 Rarity: MapRarity(card),
                 StandardLegal: card.IsLegal("standard"),
-                PioneerLegal: card.IsLegal("pioneer"));
+                PioneerLegal: card.IsLegal("pioneer"),
+                ImageUrl: image,
+                BackImageUrl: backImage);
         }
     }
 

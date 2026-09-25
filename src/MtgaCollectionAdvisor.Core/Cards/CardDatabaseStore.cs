@@ -30,8 +30,10 @@ public sealed class CardDatabaseStore(Database database)
         await using (var insert = connection.CreateCommand())
         {
             insert.CommandText = """
-                INSERT INTO cards (grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal, updated_at)
-                VALUES ($grpId, $name, $setCode, $manaCost, $colors, $rarity, $standard, $pioneer, $updatedAt)
+                INSERT INTO cards (grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal, updated_at,
+                                   image_url, back_image_url)
+                VALUES ($grpId, $name, $setCode, $manaCost, $colors, $rarity, $standard, $pioneer, $updatedAt,
+                        $imageUrl, $backImageUrl)
                 """;
             var grpId = insert.Parameters.Add("$grpId", SqliteType.Integer);
             var name = insert.Parameters.Add("$name", SqliteType.Text);
@@ -42,6 +44,8 @@ public sealed class CardDatabaseStore(Database database)
             var standard = insert.Parameters.Add("$standard", SqliteType.Integer);
             var pioneer = insert.Parameters.Add("$pioneer", SqliteType.Integer);
             insert.Parameters.AddWithValue("$updatedAt", importedAt);
+            var imageUrl = insert.Parameters.Add("$imageUrl", SqliteType.Text);
+            var backImageUrl = insert.Parameters.Add("$backImageUrl", SqliteType.Text);
 
             foreach (var card in deduped.Values)
             {
@@ -53,6 +57,8 @@ public sealed class CardDatabaseStore(Database database)
                 rarity.Value = card.Rarity.ToString();
                 standard.Value = card.StandardLegal ? 1 : 0;
                 pioneer.Value = card.PioneerLegal ? 1 : 0;
+                imageUrl.Value = (object?)card.ImageUrl ?? DBNull.Value;
+                backImageUrl.Value = (object?)card.BackImageUrl ?? DBNull.Value;
                 await insert.ExecuteNonQueryAsync(ct);
             }
         }
@@ -151,11 +157,11 @@ public sealed class CardDatabaseStore(Database database)
         """;
 
     internal const string FindByNameSql = """
-        SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal
+        SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal, image_url, back_image_url
         FROM cards
         WHERE name = $name COLLATE NOCASE
         UNION ALL
-        SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal
+        SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal, image_url, back_image_url
         FROM cards
         WHERE name >= $frontFace COLLATE NOCASE AND name < $frontFaceEnd COLLATE NOCASE
         """;
@@ -199,7 +205,9 @@ public sealed class CardDatabaseStore(Database database)
                 Colors: reader.GetString(4),
                 Rarity: Enum.Parse<CardRarity>(reader.GetString(5)),
                 StandardLegal: reader.GetInt32(6) == 1,
-                PioneerLegal: reader.GetInt32(7) == 1));
+                PioneerLegal: reader.GetInt32(7) == 1,
+                ImageUrl: reader.IsDBNull(8) ? null : reader.GetString(8),
+                BackImageUrl: reader.IsDBNull(9) ? null : reader.GetString(9)));
         }
         return results;
     }

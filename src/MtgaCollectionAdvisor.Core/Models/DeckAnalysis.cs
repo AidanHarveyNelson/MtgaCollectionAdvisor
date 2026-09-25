@@ -3,7 +3,8 @@ namespace MtgaCollectionAdvisor.Core.Models;
 /// <summary>
 /// Per-card gap between what the deck needs and what the collection owns.
 /// GrpId is null when the card could not be matched to an Arena printing at all
-/// (i.e. it does not exist on Arena, regardless of collection).
+/// (i.e. it does not exist on Arena, regardless of collection). The image URLs are those of
+/// the printing matched, so the hover preview shows the card whose rarity and cost the line uses.
 /// </summary>
 public sealed record CardGap(
     string CardName,
@@ -11,7 +12,9 @@ public sealed record CardGap(
     int Needed,
     int Owned,
     int? GrpId,
-    CardRarity Rarity)
+    CardRarity Rarity,
+    string? ImageUrl = null,
+    string? BackImageUrl = null)
 {
     public int Missing => Math.Max(0, Needed - Owned);
     public bool AvailableOnArena => GrpId is not null;

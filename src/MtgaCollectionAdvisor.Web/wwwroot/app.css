@@ -564,6 +564,46 @@ input[type="range"] { accent-color: var(--accent); }
 
 .card-qty { font-variant-numeric: tabular-nums; color: var(--text-muted); min-width: 46px; }
 .card-name { flex: 1; }
+
+/* The card image on hover (#59). Scryfall's rules: the whole card, scaled proportionally, never
+   cropped, filtered or covered, so the artist and copyright lines stay visible. */
+.card-name-hover {
+    position: relative;
+    cursor: default;
+    text-decoration: underline dotted var(--text-faint);
+    text-underline-offset: 3px;
+}
+
+.card-preview {
+    display: none;
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 14px;
+    z-index: 50;
+    gap: 6px;
+    padding: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+}
+
+.card-name-hover:hover .card-preview,
+.card-name-hover:focus-visible .card-preview { display: flex; }
+
+/* Sized before it arrives (Scryfall's "normal" is 488x680), so the first hover opens a
+   card-shaped box that the image fills, not a thin strip that jumps open. */
+.card-preview img {
+    display: block;
+    width: 244px;
+    height: auto;
+    aspect-ratio: 488 / 680;
+    border-radius: 10px;
+    background: var(--surface-raised);
+}
 .card-need { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .card-need.c { color: var(--rarity-common); }
 .card-need.u { color: var(--rarity-uncommon); }

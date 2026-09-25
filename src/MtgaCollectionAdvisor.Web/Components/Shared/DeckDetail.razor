@@ -78,7 +78,26 @@
 
     private RenderFragment RenderCardRow(CardGap gap) => @<div class="card-row @CardRowClass(gap)">
         <span class="card-qty">@gap.Owned / @gap.Needed</span>
-        <span class="card-name">@gap.CardName</span>
+        <span class="card-name">
+            @* The whole card on hover (#59), from Scryfall's image CDN. Hidden until then and
+               lazy, so the browser fetches nothing for names the mouse only passes over. *@
+            @if (gap.ImageUrl is { } front)
+            {
+                <span class="card-name-hover" tabindex="0">@gap.CardName
+                    <span class="card-preview" role="tooltip">
+                        <img src="@front" alt="@gap.CardName" loading="lazy" width="244" />
+                        @if (gap.BackImageUrl is { } back)
+                        {
+                            <img src="@back" alt="@($"{gap.CardName}, back face")" loading="lazy" width="244" />
+                        }
+                    </span>
+                </span>
+            }
+            else
+            {
+                @gap.CardName
+            }
+        </span>
         @if (gap.Missing > 0)
         {
             <span class="card-need @RarityClass(gap.Rarity)">need @gap.Missing</span>
