@@ -124,8 +124,9 @@ Assert, at minimum:
 
 - HTTP 200.
 - The markup this issue adds is present.
-- `<!--Blazor:` markers appear — without them the page is static and **nothing is
-  clickable, with no error anywhere**. Their absence is a real bug, not a test artifact.
+- `<!--Blazor:` markers appear **and** `/_framework/blazor.web.js` returns 200 — without
+  either, the page is static and **nothing is clickable, with no error anywhere**. The
+  markers alone are not enough: v0.1.1 had them and shipped without the script (#54).
 - Features that already worked still render.
 
 Stop that copy afterwards by the process listening on 5299

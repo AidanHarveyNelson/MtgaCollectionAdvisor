@@ -47,6 +47,21 @@ public sealed class ReleaseWorkflowTests
         Assert.All(publishing, step => Assert.Matches(@"if:.*startsWith\(github\.ref, 'refs/tags/v'\)", step));
     }
 
+    // The console is hidden by a flag the release passes, never by WinExe: a WinExe build
+    // leaves out blazor.web.js and ships with no button working (#54). The smoke test is what
+    // catches that before anything is packed.
+    [Fact]
+    public void ReleaseWorkflow_Should_HideConsoleAndSmokeTestBeforePacking()
+    {
+        var project = File.ReadAllText(Path.Combine(Root, "src", "MtgaCollectionAdvisor.Web", "MtgaCollectionAdvisor.Web.csproj"));
+
+        Assert.DoesNotContain("<OutputType>WinExe", project);
+        Assert.Contains("-p:WindowsAppNoConsole=true", Workflow);
+        Assert.Contains("/_framework/blazor.web.js", Workflow);
+        Assert.True(Workflow.IndexOf("name: Smoke test", StringComparison.Ordinal) < Workflow.IndexOf("name: Pack", StringComparison.Ordinal),
+            "The smoke test must run before the release is packed.");
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)

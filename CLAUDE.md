@@ -127,9 +127,15 @@ and uninstall were verified with it there. The published build pins
 its content root to the exe's folder, because the updater's restart does not set a working
 directory and the page would otherwise arrive with no CSS.
 
-**Release builds are Windows apps (`WinExe`) with no console** (#51); Debug keeps one. A
-console app gets a terminal next to its window, and closing it kills the server. Nothing
-the app logs is visible in a Release build, so the log file is the place to look (#52).
+**Never make the Web project `WinExe`.** Blazor's framework files (`blazor.web.js`) are
+only added to `Exe` projects (`Microsoft.AspNetCore.App.Internal.Assets.targets`), so a
+`WinExe` build loads, looks right, and no button works, with no error anywhere. v0.1.1
+shipped like that (#54). The release hides the console instead with
+`-p:WindowsAppNoConsole=true`, which sets the SDK's own GUI app-host flag; `dotnet run` and
+`publish-local.ps1` keep their console. The flag is cached in `obj`: after a local publish
+with it, delete `bin/Release` and `obj/Release` before building without it. The release
+workflow smoke-tests the published app (`blazor.web.js` must return 200) before packing.
+Nothing the app logs is visible without a console; the log file is the place to look (#52).
 
 Installing a release on the dev machine replaces the `MTGA Deck Advisor` desktop shortcut
 that `publish-local.ps1` makes, and uninstalling it removes that shortcut; run
