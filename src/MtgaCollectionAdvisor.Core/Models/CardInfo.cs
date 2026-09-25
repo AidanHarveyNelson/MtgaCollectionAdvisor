@@ -26,4 +26,5 @@ public sealed record CardInfo(
     bool StandardLegal,
     bool PioneerLegal,
     string? ImageUrl = null,
-    string? BackImageUrl = null);
+    string? BackImageUrl = null,
+    bool? IsNonBasicLand = null);

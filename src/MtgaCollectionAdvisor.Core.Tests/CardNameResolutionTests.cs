@@ -146,22 +146,45 @@ public sealed class CardNameResolutionTests : IAsyncLifetime
         Assert.Equal(OjerBack, gap.BackImageUrl);
     }
 
-    // A database imported before #59 has cards and no URL at all: the app re-imports it once
-    // on its own. Only then; a partly filled or empty database is left alone.
+    // A database imported before a card column existed (#59 images, #61 land flag) has cards
+    // and that column empty everywhere: the app re-imports once on its own. Only then; a partly
+    // filled or empty database is left alone.
     [Theory]
-    [InlineData(19977, 0, true)]
-    [InlineData(19977, 19977, false)]
-    [InlineData(19977, 3, false)]
-    [InlineData(0, 0, false)]
-    public void NeedsImageBackfill_Should_OnlyAskForCardsWithoutAnyImage(int cards, int withImage, bool expected)
+    [InlineData(19977, 0, 19977, true)]
+    [InlineData(19977, 19977, 0, true)]
+    [InlineData(19977, 19977, 19977, false)]
+    [InlineData(19977, 3, 5, false)]
+    [InlineData(0, 0, 0, false)]
+    public void NeedsCardDataBackfill_Should_AskWhenAnyColumnIsEmptyEverywhere(int cards, int withImage, int withLandFlag, bool expected)
     {
-        Assert.Equal(expected, CardDatabaseStore.NeedsImageBackfill(cards, withImage));
+        Assert.Equal(expected, CardDatabaseStore.NeedsCardDataBackfill(cards, withImage, withLandFlag));
     }
 
     [Fact]
-    public async Task CountImagesAsync_Should_CountCardsAndThoseWithAnImage()
+    public async Task CountCardDataAsync_Should_CountEachColumn()
     {
-        Assert.Equal((8, 1), await _store.CountImagesAsync());
+        Assert.Equal((9, 1, 2), await _store.CountCardDataAsync());
+    }
+
+    // #61: the flag survives the round trip; a card from before migration 4 reads as unknown.
+    [Fact]
+    public async Task CardStore_Should_RoundTripNonBasicLandFlag()
+    {
+        Assert.True(Assert.Single(await _store.FindByNameAsync("Stomping Ground")).IsNonBasicLand);
+        Assert.False(Assert.Single(await _store.FindByNameAsync("Ojer Taq, Deepest Foundation")).IsNonBasicLand);
+        Assert.Null(Assert.Single(await _store.FindByNameAsync("Shock")).IsNonBasicLand);
+    }
+
+    [Fact]
+    public async Task WildcardCalculator_Should_FlagNonBasicLandGaps()
+    {
+        var deck = new CandidateDeck("manual:test", "Test", "", Formats.Standard.Key, 0,
+            [new DeckCardRef("Stomping Ground", 4, DeckBoard.Main), new DeckCardRef("Shock", 4, DeckBoard.Main)], DateTimeOffset.UtcNow);
+
+        var result = await new WildcardCalculator(_store).AnalyzeAsync(deck, CollectionSnapshot.Empty, Formats.Standard, []);
+
+        Assert.True(result.Gaps.Single(g => g.CardName == "Stomping Ground").IsNonBasicLand);
+        Assert.False(result.Gaps.Single(g => g.CardName == "Shock").IsNonBasicLand);
     }
 
     private const string OjerFront = "https://cards.scryfall.io/normal/front/1/2/ojer.jpg";
@@ -200,7 +223,9 @@ public sealed class CardNameResolutionTests : IAsyncLifetime
         {
             ImageUrl = OjerFront,
             BackImageUrl = OjerBack,
+            IsNonBasicLand = false,
         };
+        yield return Card(8, "Stomping Ground") with { IsNonBasicLand = true };
         await Task.CompletedTask;
     }
 

@@ -133,6 +133,10 @@ public static class Migrations
             ALTER TABLE cards ADD COLUMN image_url TEXT;
             ALTER TABLE cards ADD COLUMN back_image_url TEXT;
             """),
+
+        // Whether a card is a non-basic land, for pricing a deck without them (#61). NULL until
+        // the automatic re-import fills it (CardDatabaseStore.NeedsCardDataBackfill).
+        new(4, "Non-basic land flag", "ALTER TABLE cards ADD COLUMN is_nonbasic_land INTEGER;"),
     ];
 
     public static int Latest => All[^1].Version;

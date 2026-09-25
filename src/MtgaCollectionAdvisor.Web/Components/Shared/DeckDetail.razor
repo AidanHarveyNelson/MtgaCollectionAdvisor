@@ -10,8 +10,17 @@
         <h2>@Deck.Deck.Name</h2>
         <ManaColors Colors="@Deck.Colors" />
         <span class="result-count">
-            @Deck.Needed.Total wildcards needed · @Deck.OwnedFraction.ToString("P0") of the list already yours
+            @Shown.Needed.Total wildcards needed · @Shown.OwnedFraction.ToString("P0") of the list already yours
         </span>
+        @if (Deck.HasNonBasicLands)
+        {
+            @* #61: a mana base is often most of a deck's rare wildcards and can wait; this shows
+               the cost without it. A view only: nothing is stored, and another deck starts off. *@
+            <label class="exclude-lands" title="Price and export this deck without its non-basic lands (duals, utility lands). Basic lands already cost nothing.">
+                <input type="checkbox" @bind="_excludeLands" />
+                Exclude non-basic lands
+            </label>
+        }
         <div class="detail-actions">
             @if (!string.IsNullOrWhiteSpace(Deck.Deck.Url))
             {
@@ -28,7 +37,7 @@
                     }
                 </a>
             }
-            <button class="primary" @onclick="OnCopy">@(Copied ? "Copied!" : "Copy for Arena")</button>
+            <button class="primary" @onclick="() => OnCopy.InvokeAsync(Shown.Deck)">@(Copied ? "Copied!" : "Copy for Arena")</button>
             @if (Deck.Deck.IsUserDeck)
             {
                 @* Fetched decks are replaced wholesale on every refresh, so editing one
@@ -39,20 +48,26 @@
         </div>
     </div>
 
+    @if (_excludeLands)
+    {
+        var (copies, cost) = Deck.NonBasicLandShare();
+        <div class="lands-note">@LandsNote(copies, cost)</div>
+    }
+
     <div class="card-columns">
         <div>
             <div class="card-list-title">Mainboard</div>
-            @foreach (var gap in Deck.Gaps.Where(g => g.Board == DeckBoard.Main).OrderBy(g => g.CardName))
+            @foreach (var gap in Shown.Gaps.Where(g => g.Board == DeckBoard.Main).OrderBy(g => g.CardName))
             {
                 @RenderCardRow(gap)
             }
         </div>
 
-        @if (Deck.Gaps.Any(g => g.Board == DeckBoard.Sideboard))
+        @if (Shown.Gaps.Any(g => g.Board == DeckBoard.Sideboard))
         {
             <div>
                 <div class="card-list-title">Sideboard</div>
-                @foreach (var gap in Deck.Gaps.Where(g => g.Board == DeckBoard.Sideboard).OrderBy(g => g.CardName))
+                @foreach (var gap in Shown.Gaps.Where(g => g.Board == DeckBoard.Sideboard).OrderBy(g => g.CardName))
                 {
                     @RenderCardRow(gap)
                 }
@@ -61,7 +76,7 @@
 
         <div>
             <div class="card-list-title">Export (Arena format)</div>
-            <textarea class="export-area" readonly>@Session.ExportDeck(Deck.Deck)</textarea>
+            <textarea class="export-area" readonly>@Session.ExportDeck(Shown.Deck)</textarea>
         </div>
     </div>
 </div>
@@ -72,9 +87,38 @@
     /// <summary>True right after Copy for Arena, so the button can confirm.</summary>
     [Parameter] public bool Copied { get; set; }
 
-    [Parameter] public EventCallback OnCopy { get; set; }
+    /// <summary>Copy for Arena, with the list as shown: without non-basic lands when excluded.</summary>
+    [Parameter] public EventCallback<CandidateDeck> OnCopy { get; set; }
     [Parameter] public EventCallback OnEdit { get; set; }
     [Parameter] public EventCallback OnRemove { get; set; }
+
+    private bool _excludeLands;
+    private string? _deckId;
+
+    // No memory (#61): opening another deck shows its original cost again.
+    protected override void OnParametersSet()
+    {
+        if (_deckId == Deck.Deck.SourceId) return;
+        _deckId = Deck.Deck.SourceId;
+        _excludeLands = false;
+    }
+
+    /// <summary>What the panel shows and exports: the deck, or the deck without non-basic lands.</summary>
+    private DeckAnalysisResult Shown => _excludeLands ? Deck.WithoutNonBasicLands() : Deck;
+
+    private static string LandsNote(int copies, WildcardNeed cost)
+    {
+        var parts = new List<string>();
+        if (cost.Mythics > 0) parts.Add($"{cost.Mythics} mythic");
+        if (cost.Rares > 0) parts.Add($"{cost.Rares} rare");
+        if (cost.Uncommons > 0) parts.Add($"{cost.Uncommons} uncommon");
+        if (cost.Commons > 0) parts.Add($"{cost.Commons} common");
+
+        var lands = $"{copies} non-basic land{(copies == 1 ? "" : "s")} left out";
+        return parts.Count == 0
+            ? $"{lands}: you already own them."
+            : $"{lands}: {string.Join(", ", parts)} wildcard{(cost.Total == 1 ? "" : "s")}.";
+    }
 
     private RenderFragment RenderCardRow(CardGap gap) => @<div class="card-row @CardRowClass(gap)">
         <span class="card-qty">@gap.Owned / @gap.Needed</span>

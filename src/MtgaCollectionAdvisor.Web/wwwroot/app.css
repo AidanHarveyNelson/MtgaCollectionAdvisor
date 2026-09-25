@@ -565,6 +565,25 @@ input[type="range"] { accent-color: var(--accent); }
 .card-qty { font-variant-numeric: tabular-nums; color: var(--text-muted); min-width: 46px; }
 .card-name { flex: 1; }
 
+/* #61: price the open deck without its non-basic lands. */
+.exclude-lands {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+.exclude-lands input { accent-color: var(--accent); cursor: pointer; }
+
+.lands-note {
+    padding: var(--space-2) var(--space-4) 0;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
 /* The card image on hover (#59). Scryfall's rules: the whole card, scaled proportionally, never
    cropped, filtered or covered, so the artist and copyright lines stay visible. */
 .card-name-hover {

@@ -69,7 +69,8 @@ public sealed class ScryfallBulkImporter(HttpClient httpClient)
                 StandardLegal: card.IsLegal("standard"),
                 PioneerLegal: card.IsLegal("pioneer"),
                 ImageUrl: image,
-                BackImageUrl: backImage);
+                BackImageUrl: backImage,
+                IsNonBasicLand: card.IsNonBasicLand());
         }
     }
 

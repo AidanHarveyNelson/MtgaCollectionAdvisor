@@ -491,12 +491,13 @@
         _copied = false;
     }
 
-    private async Task CopyDeckAsync()
+    // The deck as the panel shows it: without its non-basic lands when those are excluded (#61).
+    private async Task CopyDeckAsync(CandidateDeck deck)
     {
         if (_selected is null) return;
         try
         {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Session.ExportDeck(_selected.Deck));
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Session.ExportDeck(deck));
             _copied = true;
         }
         catch

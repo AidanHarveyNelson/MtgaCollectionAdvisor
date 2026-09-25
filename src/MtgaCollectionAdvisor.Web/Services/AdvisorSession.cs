@@ -78,18 +78,19 @@ public sealed partial class AdvisorSession(AppConfig config) : IAsyncDisposable
     public Task RefreshCardDatabaseAsync() => RunAsync("Updating card database", ImportCardsAsync);
 
     /// <summary>
-    /// A card database from before the hover previews (#59) has no image URLs; re-import it
-    /// once, in the background, rather than leave the player to find Update cards. The setup
-    /// screen imports cards itself, so it is left alone.
+    /// A card database from before a later migration's card columns (image URLs, #59; the
+    /// non-basic land flag, #61) is missing that data; re-import it once, in the background,
+    /// rather than leave the player to find Update cards. The setup screen imports cards
+    /// itself, so it is left alone.
     /// </summary>
     private async Task BackfillCardImagesIfNeededAsync()
     {
         if (Setup is not null) return;
 
-        var (cards, withImage) = await services.CardDatabaseStore.CountImagesAsync();
-        if (!CardDatabaseStore.NeedsImageBackfill(cards, withImage)) return;
+        var (cards, withImage, withLandFlag) = await services.CardDatabaseStore.CountCardDataAsync();
+        if (!CardDatabaseStore.NeedsCardDataBackfill(cards, withImage, withLandFlag)) return;
 
-        _ = Task.Run(() => RunAsync("Adding card images", ImportCardsAsync));
+        _ = Task.Run(() => RunAsync("Updating card data", ImportCardsAsync));
     }
 
     // The bodies of the operations above, shared with the first-run setup, which needs to

@@ -31,9 +31,9 @@ public sealed class CardDatabaseStore(Database database)
         {
             insert.CommandText = """
                 INSERT INTO cards (grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal, updated_at,
-                                   image_url, back_image_url)
+                                   image_url, back_image_url, is_nonbasic_land)
                 VALUES ($grpId, $name, $setCode, $manaCost, $colors, $rarity, $standard, $pioneer, $updatedAt,
-                        $imageUrl, $backImageUrl)
+                        $imageUrl, $backImageUrl, $nonBasicLand)
                 """;
             var grpId = insert.Parameters.Add("$grpId", SqliteType.Integer);
             var name = insert.Parameters.Add("$name", SqliteType.Text);
@@ -46,6 +46,7 @@ public sealed class CardDatabaseStore(Database database)
             insert.Parameters.AddWithValue("$updatedAt", importedAt);
             var imageUrl = insert.Parameters.Add("$imageUrl", SqliteType.Text);
             var backImageUrl = insert.Parameters.Add("$backImageUrl", SqliteType.Text);
+            var nonBasicLand = insert.Parameters.Add("$nonBasicLand", SqliteType.Integer);
 
             foreach (var card in deduped.Values)
             {
@@ -59,6 +60,7 @@ public sealed class CardDatabaseStore(Database database)
                 pioneer.Value = card.PioneerLegal ? 1 : 0;
                 imageUrl.Value = (object?)card.ImageUrl ?? DBNull.Value;
                 backImageUrl.Value = (object?)card.BackImageUrl ?? DBNull.Value;
+                nonBasicLand.Value = card.IsNonBasicLand is { } land ? (land ? 1 : 0) : DBNull.Value;
                 await insert.ExecuteNonQueryAsync(ct);
             }
         }
@@ -77,19 +79,21 @@ public sealed class CardDatabaseStore(Database database)
     }
 
     /// <summary>
-    /// A card database imported before the image URLs were kept (#59) has cards and no URL at
-    /// all: it needs one more import for the hover previews, which the app runs by itself.
+    /// A card database imported before a later migration's columns existed (image URLs, #59;
+    /// the non-basic land flag, #61) has cards and nothing in one of those columns: it needs
+    /// one more import, which the app runs by itself. A migration adds columns, not data.
     /// </summary>
-    public static bool NeedsImageBackfill(int cards, int cardsWithImage) => cards > 0 && cardsWithImage == 0;
+    public static bool NeedsCardDataBackfill(int cards, int withImage, int withLandFlag) =>
+        cards > 0 && (withImage == 0 || withLandFlag == 0);
 
-    public async Task<(int Cards, int CardsWithImage)> CountImagesAsync(CancellationToken ct = default)
+    public async Task<(int Cards, int WithImage, int WithLandFlag)> CountCardDataAsync(CancellationToken ct = default)
     {
         await using var connection = await database.OpenAsync(ct);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT count(*), count(image_url) FROM cards";
+        command.CommandText = "SELECT count(*), count(image_url), count(is_nonbasic_land) FROM cards";
         await using var reader = await command.ExecuteReaderAsync(ct);
         await reader.ReadAsync(ct);
-        return (reader.GetInt32(0), reader.GetInt32(1));
+        return (reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2));
     }
 
     public async Task<DateTimeOffset?> GetLastImportedAsync(CancellationToken ct = default)
@@ -173,11 +177,11 @@ public sealed class CardDatabaseStore(Database database)
         """;
 
     internal const string FindByNameSql = """
-        SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal, image_url, back_image_url
+        SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal, image_url, back_image_url, is_nonbasic_land
         FROM cards
         WHERE name = $name COLLATE NOCASE
         UNION ALL
-        SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal, image_url, back_image_url
+        SELECT grp_id, name, set_code, mana_cost, colors, rarity, standard_legal, pioneer_legal, image_url, back_image_url, is_nonbasic_land
         FROM cards
         WHERE name >= $frontFace COLLATE NOCASE AND name < $frontFaceEnd COLLATE NOCASE
         """;
@@ -223,7 +227,8 @@ public sealed class CardDatabaseStore(Database database)
                 StandardLegal: reader.GetInt32(6) == 1,
                 PioneerLegal: reader.GetInt32(7) == 1,
                 ImageUrl: reader.IsDBNull(8) ? null : reader.GetString(8),
-                BackImageUrl: reader.IsDBNull(9) ? null : reader.GetString(9)));
+                BackImageUrl: reader.IsDBNull(9) ? null : reader.GetString(9),
+                IsNonBasicLand: reader.IsDBNull(10) ? null : reader.GetInt32(10) == 1));
         }
         return results;
     }
