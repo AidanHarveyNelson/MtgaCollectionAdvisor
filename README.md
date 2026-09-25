@@ -47,7 +47,8 @@ It opens in a browser window and stores data in the same `advisor.db`. No databa
 no setup.
 
 Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed: it runs the
-tests, publishes a self-contained build, and packs it with [Velopack](https://velopack.io).
+tests, publishes a self-contained build, and packs it with [Velopack](https://velopack.io). How to cut
+a new version is in [RELEASING.md](RELEASING.md).
 
 ## How the collection is read
 
