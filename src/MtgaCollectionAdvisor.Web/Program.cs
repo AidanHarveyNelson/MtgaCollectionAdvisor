@@ -3,6 +3,7 @@ using MtgaCollectionAdvisor.Core;
 using MtgaCollectionAdvisor.Core.Configuration;
 using MtgaCollectionAdvisor.Core.Export;
 using MtgaCollectionAdvisor.Core.Hosting;
+using MtgaCollectionAdvisor.Core.Storage;
 using MtgaCollectionAdvisor.Web.Components;
 using MtgaCollectionAdvisor.Web.Services;
 using Velopack;
@@ -34,6 +35,14 @@ var publishedRoot = Directory.Exists(Path.Combine(AppContext.BaseDirectory, "www
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = publishedRoot });
 
 builder.Logging.SetMinimumLevel(LogLevel.Warning);
+
+// Warnings, errors and a few startup lines go to a daily file next to the database (#52): the
+// installed app has no console, and this is what a player can send when something goes wrong.
+var databasePath = Database.CreateDefault(AppConfig.Default.DatabasePathOverride).FilePath;
+var fileLog = new FileLoggerProvider(LogFiles.FolderFor(databasePath));
+builder.Logging.AddProvider(fileLog);
+builder.Logging.AddFilter<FileLoggerProvider>(LogFiles.StartupCategory, LogLevel.Information);
+
 builder.WebHost.UseUrls(appUrl);
 
 builder.Services.AddRazorComponents()
@@ -55,6 +64,12 @@ builder.Services.AddScoped<CircuitHandler, WindowPresenceCircuitHandler>();
 builder.Services.AddHostedService<StopWhenNoWindowService>();
 
 var app = builder.Build();
+
+fileLog.DeleteExpired(DateOnly.FromDateTime(DateTime.Now));
+var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(LogFiles.StartupCategory);
+startupLog.LogInformation("MTGA Deck Advisor {Version} starting", AppVersion.Current);
+startupLog.LogInformation("Content root: {ContentRoot}", app.Environment.ContentRootPath);
+startupLog.LogInformation("Database: {Database}", databasePath);
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseAntiforgery();

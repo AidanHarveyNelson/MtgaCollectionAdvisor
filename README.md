@@ -73,6 +73,13 @@ backed up next to itself before an update changes its format.
   reads another program's memory (see below), which antivirus software looks at closely.
   The code is all here to check, and each release lists the SHA-256 of its files.
 
+## Reporting a problem
+
+Open an issue and attach the app's latest log file. Click **Logs** at the bottom of the app to
+open the folder (`%LOCALAPPDATA%\MtgaCollectionAdvisor\logs`); each day has its own file, and a
+week is kept. The log holds warnings, errors and the app's version. It contains file paths,
+which include your Windows user name, but not your collection or your decks.
+
 ## How the collection is read
 
 The app reads the memory of the running `MTGA.exe` process. The current Arena client doesn't
