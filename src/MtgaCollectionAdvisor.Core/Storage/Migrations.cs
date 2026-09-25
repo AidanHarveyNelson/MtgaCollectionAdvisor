@@ -126,6 +126,13 @@ public static class Migrations
 
         // Left behind by an early build of the Creators tab; nothing reads it.
         new(2, "Drop creator_feed_state", "DROP TABLE IF EXISTS creator_feed_state;"),
+
+        // Scryfall image URLs for the hover preview (#59). cards is a cache table: existing rows
+        // get NULL until the next Update cards fills them.
+        new(3, "Card image URLs", """
+            ALTER TABLE cards ADD COLUMN image_url TEXT;
+            ALTER TABLE cards ADD COLUMN back_image_url TEXT;
+            """),
     ];
 
     public static int Latest => All[^1].Version;

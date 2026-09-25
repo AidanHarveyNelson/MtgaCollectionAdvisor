@@ -1,5 +1,6 @@
 using MtgaCollectionAdvisor.Core;
 using MtgaCollectionAdvisor.Core.Arena;
+using MtgaCollectionAdvisor.Core.Cards;
 using MtgaCollectionAdvisor.Core.Configuration;
 using MtgaCollectionAdvisor.Core.Creators;
 using MtgaCollectionAdvisor.Core.Decks;
@@ -58,6 +59,7 @@ public sealed partial class AdvisorSession(AppConfig config) : IAsyncDisposable
 
         await ReloadRankingAsync();
         await StartSetupIfNeededAsync();
+        await BackfillCardImagesIfNeededAsync();
 
         _mtgaWatchTimer = new System.Threading.Timer(_ => _ = AutoScanIfGameStartedAsync(), null,
             TimeSpan.Zero, TimeSpan.FromSeconds(20));
@@ -74,6 +76,21 @@ public sealed partial class AdvisorSession(AppConfig config) : IAsyncDisposable
     public Task FetchDecksAsync() => RunAsync($"Fetching {Format.DisplayName} decks", report => FetchDecksAsync(Format, report));
 
     public Task RefreshCardDatabaseAsync() => RunAsync("Updating card database", ImportCardsAsync);
+
+    /// <summary>
+    /// A card database from before the hover previews (#59) has no image URLs; re-import it
+    /// once, in the background, rather than leave the player to find Update cards. The setup
+    /// screen imports cards itself, so it is left alone.
+    /// </summary>
+    private async Task BackfillCardImagesIfNeededAsync()
+    {
+        if (Setup is not null) return;
+
+        var (cards, withImage) = await services.CardDatabaseStore.CountImagesAsync();
+        if (!CardDatabaseStore.NeedsImageBackfill(cards, withImage)) return;
+
+        _ = Task.Run(() => RunAsync("Adding card images", ImportCardsAsync));
+    }
 
     // The bodies of the operations above, shared with the first-run setup, which needs to
     // know whether each one worked rather than only what it said in the status bar.

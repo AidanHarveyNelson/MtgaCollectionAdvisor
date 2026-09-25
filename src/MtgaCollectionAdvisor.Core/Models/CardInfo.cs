@@ -13,7 +13,8 @@ public enum CardRarity
 /// <summary>
 /// Card metadata sourced from Scryfall's bulk data, keyed by the Arena "grpId"
 /// (Scryfall's arena_id field), which is the same identifier used in the MTGA
-/// collection dump and wildcard economy.
+/// collection dump and wildcard economy. The image URLs are Scryfall's "normal" size, on its
+/// image CDN; the back face's is only set for a double-faced card.
 /// </summary>
 public sealed record CardInfo(
     int GrpId,
@@ -23,4 +24,6 @@ public sealed record CardInfo(
     string Colors,
     CardRarity Rarity,
     bool StandardLegal,
-    bool PioneerLegal);
+    bool PioneerLegal,
+    string? ImageUrl = null,
+    string? BackImageUrl = null);

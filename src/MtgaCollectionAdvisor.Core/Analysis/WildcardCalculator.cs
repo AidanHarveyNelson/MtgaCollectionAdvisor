@@ -61,7 +61,8 @@ public sealed class WildcardCalculator(CardDatabaseStore cardStore)
 
             ownedCopies += Math.Min(ownedAcrossPrintings, cardRef.Quantity);
 
-            var gap = new CardGap(cardRef.Name, cardRef.Board, cardRef.Quantity, ownedAcrossPrintings, cheapest.GrpId, cheapest.Rarity);
+            var gap = new CardGap(cardRef.Name, cardRef.Board, cardRef.Quantity, ownedAcrossPrintings, cheapest.GrpId, cheapest.Rarity,
+                cheapest.ImageUrl, cheapest.BackImageUrl);
             gaps.Add(gap);
 
             if (cheapest.Rarity != CardRarity.Basic)

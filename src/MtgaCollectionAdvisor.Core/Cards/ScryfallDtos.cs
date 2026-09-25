@@ -18,10 +18,17 @@ internal sealed class ScryfallBulkDataResponse
     [JsonPropertyName("data")] public List<ScryfallBulkDataEntry> Data { get; set; } = [];
 }
 
+/// <summary>Only the size the app shows; Scryfall also lists small, large, png and crops.</summary>
+internal sealed class ScryfallImageUris
+{
+    [JsonPropertyName("normal")] public string? Normal { get; set; }
+}
+
 internal sealed class ScryfallCardFace
 {
     [JsonPropertyName("mana_cost")] public string? ManaCost { get; set; }
     [JsonPropertyName("colors")] public List<string>? Colors { get; set; }
+    [JsonPropertyName("image_uris")] public ScryfallImageUris? ImageUris { get; set; }
 }
 
 internal sealed class ScryfallCard
@@ -35,6 +42,7 @@ internal sealed class ScryfallCard
     [JsonPropertyName("rarity")] public string Rarity { get; set; } = "";
     [JsonPropertyName("legalities")] public Dictionary<string, string> Legalities { get; set; } = [];
     [JsonPropertyName("card_faces")] public List<ScryfallCardFace>? CardFaces { get; set; }
+    [JsonPropertyName("image_uris")] public ScryfallImageUris? ImageUris { get; set; }
 
     public string EffectiveManaCost =>
         !string.IsNullOrEmpty(ManaCost) ? ManaCost :
@@ -50,6 +58,25 @@ internal sealed class ScryfallCard
             .OrderBy(c => c);
         return string.Concat(union);
     }
+
+    /// <summary>
+    /// The card's "normal" image (488x680), and its back face's for a double-faced card. A
+    /// card with one image for all its faces (split, adventure, flip) has it at the top level;
+    /// a double-faced card has none there and one per face instead.
+    /// </summary>
+    public (string? Front, string? Back) NormalImageUrls()
+    {
+        if (Https(ImageUris?.Normal) is { } single) return (single, null);
+
+        var faces = (CardFaces ?? []).Select(f => Https(f.ImageUris?.Normal)).ToList();
+        return faces.Count > 0 && faces[0] is { } front
+            ? (front, faces.Count > 1 ? faces[1] : null)
+            : (null, null);
+    }
+
+    // Stored and later put in an <img src>: anything but an https URL is dropped.
+    private static string? Https(string? url) =>
+        url is not null && url.StartsWith("https://", StringComparison.Ordinal) ? url : null;
 
     public bool IsLegal(string formatKey) =>
         Legalities.TryGetValue(formatKey, out var status) && status == "legal";

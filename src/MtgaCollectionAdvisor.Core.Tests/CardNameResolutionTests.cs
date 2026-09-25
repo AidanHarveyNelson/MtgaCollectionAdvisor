@@ -1,3 +1,4 @@
+using MtgaCollectionAdvisor.Core.Analysis;
 using MtgaCollectionAdvisor.Core.Cards;
 using MtgaCollectionAdvisor.Core.Models;
 using MtgaCollectionAdvisor.Core.Storage;
@@ -117,6 +118,55 @@ public sealed class CardNameResolutionTests : IAsyncLifetime
         Assert.Equal(2, CountOf(plan, "SEARCH cards USING INDEX ix_cards_name"));
     }
 
+    // #59: the hover preview's URLs survive the round trip, and a card without them stays
+    // without (an old database before its next Update cards).
+    [Fact]
+    public async Task CardStore_Should_RoundTripImageUrls()
+    {
+        var ojer = Assert.Single(await _store.FindByNameAsync("Ojer Taq, Deepest Foundation"));
+        Assert.Equal(OjerFront, ojer.ImageUrl);
+        Assert.Equal(OjerBack, ojer.BackImageUrl);
+
+        var shock = Assert.Single(await _store.FindByNameAsync("Shock"));
+        Assert.Null(shock.ImageUrl);
+        Assert.Null(shock.BackImageUrl);
+    }
+
+    [Fact]
+    public async Task WildcardCalculator_Should_CarryImageUrlsOfMatchedPrinting()
+    {
+        var deck = new CandidateDeck("manual:test", "Test", "", Formats.Standard.Key, 0,
+            [new DeckCardRef("Ojer Taq, Deepest Foundation", 2, DeckBoard.Main)], DateTimeOffset.UtcNow);
+
+        var result = await new WildcardCalculator(_store).AnalyzeAsync(deck, CollectionSnapshot.Empty, Formats.Standard, []);
+
+        var gap = Assert.Single(result.Gaps);
+        Assert.Equal(7, gap.GrpId);
+        Assert.Equal(OjerFront, gap.ImageUrl);
+        Assert.Equal(OjerBack, gap.BackImageUrl);
+    }
+
+    // A database imported before #59 has cards and no URL at all: the app re-imports it once
+    // on its own. Only then; a partly filled or empty database is left alone.
+    [Theory]
+    [InlineData(19977, 0, true)]
+    [InlineData(19977, 19977, false)]
+    [InlineData(19977, 3, false)]
+    [InlineData(0, 0, false)]
+    public void NeedsImageBackfill_Should_OnlyAskForCardsWithoutAnyImage(int cards, int withImage, bool expected)
+    {
+        Assert.Equal(expected, CardDatabaseStore.NeedsImageBackfill(cards, withImage));
+    }
+
+    [Fact]
+    public async Task CountImagesAsync_Should_CountCardsAndThoseWithAnImage()
+    {
+        Assert.Equal((8, 1), await _store.CountImagesAsync());
+    }
+
+    private const string OjerFront = "https://cards.scryfall.io/normal/front/1/2/ojer.jpg";
+    private const string OjerBack = "https://cards.scryfall.io/normal/back/1/2/ojer.jpg";
+
     private static int CountOf(string text, string part) =>
         (text.Length - text.Replace(part, "").Length) / part.Length;
 
@@ -146,6 +196,11 @@ public sealed class CardNameResolutionTests : IAsyncLifetime
         yield return Card(4, "Fire // Ice");
         yield return Card(5, "Fireball");
         yield return Card(6, "Fire Ants");
+        yield return Card(7, "Ojer Taq, Deepest Foundation // Temple of Civilization") with
+        {
+            ImageUrl = OjerFront,
+            BackImageUrl = OjerBack,
+        };
         await Task.CompletedTask;
     }
 
