@@ -112,8 +112,12 @@ the component just builds a `DeckFilterCriteria` and calls it.
 
 Tests use plain xUnit `Assert`; there is no mocking library, because nothing here needs one.
 Tests that genuinely need storage create a throwaway SQLite file and delete it in teardown
-(see `CardNameSearchTests`), calling `SqliteConnection.ClearAllPools()` first or the file
-stays locked on Windows.
+with `TestDatabaseFiles.Delete` (see `CardNameSearchTests`): a pooled connection keeps the
+file locked on Windows, so its pool is cleared first. **Never `SqliteConnection.ClearAllPools()`**
+(#41): xUnit runs test classes in parallel, and it closes the connections other classes are
+still using. They fail at random with `ObjectDisposedException: SQLitePCL.sqlite3`, rarely on
+an idle machine and often under load. To check a fix for this kind of failure, run a few
+`dotnet test` in parallel, several times.
 
 ## Database schema
 

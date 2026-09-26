@@ -27,8 +27,7 @@ public sealed class DeckSyncMergeTests : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        SqliteConnection.ClearAllPools();
-        if (File.Exists(_databasePath)) File.Delete(_databasePath);
+        TestDatabaseFiles.Delete(_databasePath);
         return Task.CompletedTask;
     }
 

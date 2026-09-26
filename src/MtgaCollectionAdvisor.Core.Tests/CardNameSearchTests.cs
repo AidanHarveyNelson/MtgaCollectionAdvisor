@@ -25,8 +25,7 @@ public sealed class CardNameSearchTests : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        if (File.Exists(_databasePath)) File.Delete(_databasePath);
+        TestDatabaseFiles.Delete(_databasePath);
         return Task.CompletedTask;
     }
 
