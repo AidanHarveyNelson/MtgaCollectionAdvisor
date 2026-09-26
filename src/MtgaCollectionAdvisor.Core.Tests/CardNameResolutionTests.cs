@@ -145,24 +145,29 @@ public sealed class CardNameResolutionTests : IAsyncLifetime
         Assert.Equal(OjerBack, gap.BackImageUrl);
     }
 
-    // A database imported before a card column existed (#59 images, #61 land flag) has cards
-    // and that column empty everywhere: the app re-imports once on its own. Only then; a partly
-    // filled or empty database is left alone.
+    // A database imported before a card column existed (#59 images, #61 land flag, #76 Brawl
+    // legality) has cards and that column empty everywhere: the app re-imports once on its own.
+    // Only then; a partly filled or empty database is left alone.
     [Theory]
-    [InlineData(19977, 0, 19977, true)]
-    [InlineData(19977, 19977, 0, true)]
-    [InlineData(19977, 19977, 19977, false)]
-    [InlineData(19977, 3, 5, false)]
-    [InlineData(0, 0, 0, false)]
-    public void NeedsCardDataBackfill_Should_AskWhenAnyColumnIsEmptyEverywhere(int cards, int withImage, int withLandFlag, bool expected)
+    [InlineData(19977, 0, 19977, 19977, 19977, true)]
+    [InlineData(19977, 19977, 0, 19977, 19977, true)]
+    [InlineData(19977, 19977, 19977, 0, 19977, true)]
+    [InlineData(19977, 19977, 19977, 19977, 0, true)]
+    [InlineData(19977, 19977, 19977, 19977, 19977, false)]
+    [InlineData(19977, 3, 5, 7, 9, false)]
+    [InlineData(0, 0, 0, 0, 0, false)]
+    public void NeedsCardDataBackfill_Should_AskWhenAnyColumnIsEmptyEverywhere(
+        int cards, int withImage, int withLandFlag, int withBrawl, int withStandardBrawl, bool expected)
     {
-        Assert.Equal(expected, CardDatabaseStore.NeedsCardDataBackfill(cards, withImage, withLandFlag));
+        Assert.Equal(expected, CardDatabaseStore.NeedsCardDataBackfill(
+            new CardDataCounts(cards, withImage, withLandFlag, withBrawl, withStandardBrawl)));
     }
 
     [Fact]
     public async Task CountCardDataAsync_Should_CountEachColumn()
     {
-        Assert.Equal((9, 1, 2), await _store.CountCardDataAsync());
+        // Brawl legalities are always written by an import (0 or 1), so every card has them.
+        Assert.Equal(new CardDataCounts(9, 1, 2, 9, 9), await _store.CountCardDataAsync());
     }
 
     // #61: the flag survives the round trip; a card from before migration 4 reads as unknown.
