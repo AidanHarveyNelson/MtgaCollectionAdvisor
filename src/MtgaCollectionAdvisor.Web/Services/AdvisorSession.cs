@@ -21,6 +21,8 @@ public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSess
 {
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private System.Threading.Timer? _mtgaWatchTimer;
+    private System.Threading.Timer? _cardRefreshTimer;
+    private int _cardRefreshRunning;
     private bool _mtgaWasRunning;
     private AdvisorServices services = null!;
 
@@ -29,7 +31,21 @@ public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSess
     /// <summary>Set when the app could not start (database unreachable); the UI shows it.</summary>
     public string? StartupError { get; private set; }
 
-    public string Status { get; private set; } = "Ready.";
+    public string Status
+    {
+        get => _status;
+        private set
+        {
+            _status = value;
+            StatusIsError = false; // any new message replaces a failure
+        }
+    }
+
+    private string _status = "Ready.";
+
+    /// <summary>True while the status bar shows a failure, so it can be told apart from "Ready.".</summary>
+    public bool StatusIsError { get; private set; }
+
     public bool IsBusy { get; private set; }
     public string? BusyOperation { get; private set; }
 
@@ -50,6 +66,7 @@ public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSess
             log.LogError(ex, "Could not open the local database");
             StartupError = $"Could not open the local database: {ex.Message}";
             Status = StartupError;
+            StatusIsError = true;
             Notify();
             return;
         }
@@ -68,6 +85,12 @@ public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSess
 
         _mtgaWatchTimer = new System.Threading.Timer(_ => _ = AutoScanIfGameStartedAsync(), null,
             TimeSpan.Zero, TimeSpan.FromSeconds(20));
+
+        // A new set's cards (#89). The tick only compares stored times; the network is used when
+        // CardRefreshSchedule allows it, at most every 6 hours per call. A minute after start, so
+        // the start-up work (and a card backfill, if one runs) goes first.
+        _cardRefreshTimer = new System.Threading.Timer(_ => _ = RefreshCardsForNewSetIfNeededAsync(), null,
+            TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(30));
     }
 
     /// <summary>The user's own decks per format key, so an empty User decks tab can say where the others are.</summary>
@@ -98,6 +121,37 @@ public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSess
         if (!CardDatabaseStore.NeedsCardDataBackfill(await services.CardDatabaseStore.CountCardDataAsync())) return;
 
         _ = Task.Run(() => RunAsync("Updating card data", ImportCardsAsync));
+    }
+
+    /// <summary>
+    /// Re-imports the card database once when the maintainer's card-data.json says a new set has
+    /// landed and Scryfall has it (#89). In the background, like the backfill above: nothing to
+    /// click, and the status bar says what is happening. Skipped during the first-run setup and
+    /// while another operation runs; a skipped tick records nothing, so a later one goes ahead.
+    /// </summary>
+    private async Task RefreshCardsForNewSetIfNeededAsync()
+    {
+        if (Setup is not null || IsBusy) return;
+        if (Interlocked.Exchange(ref _cardRefreshRunning, 1) == 1) return;
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var check = await services.CardRefreshService.CheckAsync(now);
+            if (check.ReadFailure is { } reason) log.LogWarning("Card refresh check learnt nothing new: {Reason}", reason);
+            if (!check.ShouldImport || IsBusy) return;
+
+            // Recorded first, so an import that fails is tried again only in the next window.
+            await services.CardRefreshService.RecordAutoImportAsync(now);
+            await RunAsync("Updating cards for a new set", ImportCardsAsync);
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "Card refresh check failed");
+        }
+        finally
+        {
+            Volatile.Write(ref _cardRefreshRunning, 0);
+        }
     }
 
     // The bodies of the operations above, shared with the first-run setup, which needs to
@@ -133,7 +187,10 @@ public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSess
     private async Task ImportCardsAsync(Action<string> report)
     {
         report("Downloading Scryfall bulk data (a few minutes)...");
-        await services.CardDatabaseStore.ReplaceAllAsync(services.ScryfallBulkImporter.ImportAsync());
+        // Records which Scryfall file the cards came from: every import, manual or not, is what
+        // clears a pending card-data flag (#89).
+        var file = await services.ScryfallBulkImporter.GetDefaultCardsAsync();
+        await services.CardDatabaseStore.ReplaceAllAsync(services.ScryfallBulkImporter.ImportAsync(file), file.UpdatedAt);
         CardsUpdatedAt = await services.CardDatabaseStore.GetLastImportedAsync();
         report("Card database updated.");
         await ReloadRankingAsync();
@@ -174,6 +231,34 @@ public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSess
     public DataExportService? DataExport => services?.DataExportService;
 
     public bool IsPinned(string sourceId) => Pins.ContainsKey(sourceId);
+
+    /// <summary>
+    /// Why a card name can go unrecognised (#87), for every place that says so. The app can't
+    /// tell these apart, so it names them all - and a new set's cards are the common case.
+    /// </summary>
+    public const string UnrecognisedHint =
+        "Not in the card database: a card from a set that isn't on Arena yet, a name in another " +
+        "language, or a typo. Update cards (under More) picks up new sets once they reach Arena.";
+
+    /// <summary>
+    /// The wildcards the deck open in the list needs, so the top bar can show which of the
+    /// player's totals fall short of it. Null when no deck is open.
+    /// </summary>
+    public WildcardNeed? OpenDeckNeed { get; private set; }
+
+    /// <summary>
+    /// Its own event, not Changed: the deck list resets to page 1 on Changed, so opening a
+    /// deck on page 3 would send the list back to page 1.
+    /// </summary>
+    public event Action? OpenDeckChanged;
+
+    /// <summary>Only raises OpenDeckChanged on a change: the deck list calls this on every render.</summary>
+    public void SetOpenDeck(WildcardNeed? need)
+    {
+        if (OpenDeckNeed == need) return;
+        OpenDeckNeed = need;
+        OpenDeckChanged?.Invoke();
+    }
 
     /// <summary>
     /// Pins or unpins without refetching anything - the ranking in memory is unchanged,
@@ -490,7 +575,7 @@ public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSess
             if (updated > 0) parts.Add($"{updated} updated");
             report(parts.Count == 0
                 ? "No Arena decks imported."
-                : $"Arena decks: {string.Join(", ", parts)}. Find them under User decks.");
+                : $"Arena decks: {string.Join(", ", parts)}. Find them under My decks.");
         });
 
     private async Task<IReadOnlySet<string>> LoadUserDeckIdsAsync()
@@ -570,6 +655,7 @@ public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSess
             // Shown in the status bar, and kept in the log file (#52) for when a player reports it.
             log.LogError(ex, "{Operation} failed", operation);
             Status = $"{operation} failed: {ex.Message}";
+            StatusIsError = true;
         }
         finally
         {
@@ -631,6 +717,7 @@ public sealed partial class AdvisorSession(AppConfig config, ILogger<AdvisorSess
     public async ValueTask DisposeAsync()
     {
         if (_mtgaWatchTimer is not null) await _mtgaWatchTimer.DisposeAsync();
+        if (_cardRefreshTimer is not null) await _cardRefreshTimer.DisposeAsync();
         if (_setupArenaPoll is not null) await _setupArenaPoll.DisposeAsync();
         if (services is not null) await services.DisposeAsync();
         _operationGate.Dispose();

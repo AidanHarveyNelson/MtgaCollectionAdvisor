@@ -93,16 +93,22 @@ public sealed record DeckFilterCriteria
     /// </summary>
     public DeckSourceFilter Source { get; init; } = DeckSourceFilter.Any;
 
-    public bool IsEmpty =>
-        Colors.Count == 0
-        && !OnlyCraftable
-        && MaxWildcards is null
-        && RarityBudget.IsUnlimited
-        && MinOwnedFraction is null
-        && string.IsNullOrWhiteSpace(NameSearch)
-        && ContainsCards.Count == 0
-        && ExcludesCards.Count == 0
-        && !OnlyPinned;
+    public bool IsEmpty => ActiveCount == 0;
+
+    /// <summary>
+    /// How many filters are set, one per control the player touched (the colours count once,
+    /// the per-rarity budget once), so a collapsed filter column can say that filters apply.
+    /// </summary>
+    public int ActiveCount =>
+        (Colors.Count > 0 ? 1 : 0)
+        + (OnlyCraftable ? 1 : 0)
+        + (MaxWildcards is not null ? 1 : 0)
+        + (RarityBudget.IsUnlimited ? 0 : 1)
+        + (MinOwnedFraction is not null ? 1 : 0)
+        + (string.IsNullOrWhiteSpace(NameSearch) ? 0 : 1)
+        + (ContainsCards.Count > 0 ? 1 : 0)
+        + (ExcludesCards.Count > 0 ? 1 : 0)
+        + (OnlyPinned ? 1 : 0);
 }
 
 public static class DeckFilter
@@ -140,17 +146,19 @@ public static class DeckFilter
         // and here it filters nothing rather than everything.
         if (criteria.OnlyCraftable && wallet is not null)
         {
-            query = query.Where(d => d.Needed.IsAffordableWith(wallet));
+            query = query.Where(d => d.IsCraftableWith(wallet));
         }
 
+        // A deck with unrecognised cards has a cost that is only a floor (#87): it can't be
+        // said to fit a budget, so the budgets leave it out.
         if (criteria.MaxWildcards is { } max)
         {
-            query = query.Where(d => d.Needed.Total <= Math.Max(0, max));
+            query = query.Where(d => d.FullyPlayableOnArena && d.Needed.Total <= Math.Max(0, max));
         }
 
         if (!criteria.RarityBudget.IsUnlimited)
         {
-            query = query.Where(d => criteria.RarityBudget.Allows(d.Needed));
+            query = query.Where(d => d.FullyPlayableOnArena && criteria.RarityBudget.Allows(d.Needed));
         }
 
         if (criteria.MinOwnedFraction is { } minOwned)

@@ -109,6 +109,22 @@ because a `bool` parameter's value is read as C#, but `QuoteStatus="_quoteStatus
 text "_quoteStatus": the button showed the field's name, with no warning. Write
 `QuoteStatus="@_quoteStatus"`.
 
+**Two more places Razor prints code as text, with no warning** (#85). `Deck@SortArrow(x)`,
+right after a word, is read as an e-mail address: the header showed "Deck@SortArrow(...)".
+Write `Deck@(SortArrow(x))`. And an attribute's text is escaped, so `placeholder="a&#10;b"`
+showed `&#10;`: put the string in a C# field with a real `\n`.
+
+**Don't raise `AdvisorSession.Changed` for view state** (#85). `Decks.razor` resets to page 1
+on every `Changed`, so a notification from a click (opening a deck on page 3) sends the list
+back to page 1. View state shared with the layout gets its own event (`OpenDeckChanged`).
+
+**Colours are tokens in `app.css`, defined for both themes** (#85). Colour carries information
+only (rarity, mana, owned or missing, good or bad, pinned); the rest is neutral, and every text
+colour passes WCAG AA in both themes. A new colour is a token with a light and a dark value,
+never a hex value in a rule. The theme is `data-theme` on `<html>`, set by a script in
+`App.razor` before the first paint; the light values are written twice in `app.css`, once for
+the Windows setting and once for the player's pick.
+
 **Windows has two region settings** (#62): the home location ("Country or region",
 `GetUserDefaultGeoName`) and the regional format, the only one `RegionInfo.CurrentRegion`
 follows. They often differ; `WindowsRegion` reads both.
@@ -260,6 +276,23 @@ GitHub's raw URL at most once a day, with the last good copy stored (`creator_ro
 needed; `CreatorRosterTests` fails CI when an entry would be dropped. The compiled list only
 catches up at a release. While the repository is private the raw URL returns 404 and every copy
 uses the compiled list. Only the maintainer curates it: no UI adds channels.
+
+**When a new set reaches Arena, set `refreshCardsAfter` in `card-data.json`** (#89), at the
+repository root: an ISO 8601 UTC time, committed to `master`, no release needed. Each copy
+re-imports its cards once, after Scryfall has a file generated past that time. A test fails CI
+if the file doesn't parse. **Scryfall's file date is no sign of new cards**: `default_cards`
+is regenerated every 12 hours with prices in it, so its `updated_at` changes twice a day;
+it only answers "is there a file newer than X". Each import records the file it used
+(`card_import_state.source_updated_at`), which is what stops a second import for one flag.
+To watch a real refresh without touching `master`, serve a `card-data.json` locally and point
+`MTGA_ADVISOR_CARD_DATA_URL` at it, on a test copy (`MTGA_ADVISOR_DB_PATH`) whose
+`source_updated_at` is set back; the first check runs a minute after start.
+
+**Every network call gets a ceiling per install before it gets code** (#89): how often in the
+worst case (restarts, retries), held across restarts by storing the times, and "no news" on
+failure, never a retry loop. A player's app that meets a provider's rate limit looks broken
+and says nothing. Put the schedule in Core with a test, as `CardRefreshSchedule` and
+`CreatorFeedSchedule` do; gate a large download behind a small check.
 
 **Card images come from Scryfall's image CDN, by URLs stored at import** (#59). The bulk
 file already carries `image_uris`; a double-faced card has none at the top level and one per
