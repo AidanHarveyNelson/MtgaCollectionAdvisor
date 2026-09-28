@@ -3,8 +3,8 @@ using System.Diagnostics;
 namespace MtgaCollectionAdvisor.Web.Services;
 
 /// <summary>
-/// Opens the app's window: Edge or Chrome in <c>--app</c> mode (no address bar or tabs), or
-/// the default browser when neither is installed.
+/// Chromium's --app mode gives a plain window with no address bar or tabs, so the tool
+/// feels like a desktop app. Falls back to the default browser when neither is present.
 /// </summary>
 public static class AppWindowLaunch
 {

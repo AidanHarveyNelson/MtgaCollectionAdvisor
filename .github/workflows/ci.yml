@@ -17,6 +17,7 @@ jobs:
     # The job name is the status check the master ruleset requires; renaming it
     # blocks every pull request until the ruleset is updated to match.
     name: build-and-test
+    # The memory scanner uses the platform's APIs, so build and test where the app runs.
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
