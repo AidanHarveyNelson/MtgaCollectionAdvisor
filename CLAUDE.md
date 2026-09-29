@@ -23,8 +23,13 @@ Reading process memory (`Core/Memory/`) is the only route. Wildcard totals *are*
 
 **On macOS the memory is read through Mach** (`ProcessMemoryReader`). `task_for_pid` fails
 unless the app is signed with the `com.apple.security.cs.debugger` entitlement; an ad-hoc
-signature is enough, and the Web csproj re-signs the binary after Build and Publish. A Mach
-read fails whole when any page is unreadable, so `ReadPartial` retries page by page.
+signature is enough, and the Web csproj re-signs the binary after Build and Publish. The
+user also needs developer tools access (the `_developer` group, which Xcode or its command
+line tools set up, or `DevToolsSecurity -enable`): a correctly signed app failing with Mach
+error 5 is more likely a group problem than a signing problem. Verified only for a
+`_developer` member, with `DevToolsSecurity` disabled; an account outside the group is
+untested. A Mach read fails whole when any page is unreadable, so `ReadPartial` retries page
+by page.
 
 **The decks saved in Arena *are* in `Player.log`**, unlike the collection. They come in the
 `StartHook` login message, which is also the one carrying wildcard totals: `DeckSummaries`

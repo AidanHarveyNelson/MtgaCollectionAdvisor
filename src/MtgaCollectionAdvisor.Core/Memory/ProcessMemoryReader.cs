@@ -156,8 +156,11 @@ public sealed class ProcessMemoryReader : IDisposable
         if (result != MachNativeMethods.KERN_SUCCESS)
         {
             throw new MemoryScanException(
-                $"Could not open the MTG Arena process for reading (Mach error {result}). This app must be " +
-                "code-signed with the com.apple.security.cs.debugger entitlement to read another process's memory.");
+                $"Could not open the MTG Arena process for reading (Mach error {result}). The likely cause is " +
+                "that this account has no developer tools access: in Terminal, add it to the _developer group " +
+                "(sudo dseditgroup -o edit -a \"$USER\" -t user _developer) or run sudo DevToolsSecurity -enable, " +
+                "then log out and back in. The other possible cause is that the app is not code-signed with the " +
+                "com.apple.security.cs.debugger entitlement.");
         }
 
         return new ProcessMemoryReader((IntPtr)task, process.Id);
